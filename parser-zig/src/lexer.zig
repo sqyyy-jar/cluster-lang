@@ -1,4 +1,7 @@
 const std = @import("std");
+const isWhitespace = std.ascii.isWhitespace;
+const isDigit = std.ascii.isDigit;
+const isAlphanumeric = std.ascii.isAlphanumeric;
 
 pub const Lexer = struct {
     const Self = @This();
@@ -27,7 +30,7 @@ pub const Lexer = struct {
     pub fn skip_whitespace(self: *Self) void {
         while (true) {
             const c = self.peek();
-            if (std.ascii.isWhitespace(c)) {
+            if (isWhitespace(c)) {
                 self.eat();
                 continue;
             }
@@ -81,10 +84,6 @@ pub const Lexer = struct {
             '#' => {
                 self.eat();
                 return Token.init(.hashtag, self.source[index..self.index]);
-            },
-            '.' => {
-                self.eat();
-                return Token.init(.dot, self.source[index..self.index]);
             },
             ',' => {
                 self.eat();
@@ -198,8 +197,38 @@ pub const Lexer = struct {
                 }
                 return Token.init(.greater, self.source[index..self.index]);
             },
-            '0'...'9' => {
-                unreachable;
+            '.', '0'...'9' => {
+                var is_float = c == '.';
+                self.eat();
+                const ac = self.peek();
+                if (is_float and !isDigit(ac)) {
+                    return Token.init(.dot, self.source[index..self.index]);
+                }
+                while (true) {
+                    const bc = self.peek();
+                    if (bc == '.') {
+                        if (is_float) {
+                            // todo: error (float with >1 dot)
+                            unreachable;
+                        }
+                        self.eat();
+                        is_float = true;
+                        continue;
+                    }
+                    if (!isDigit(bc)) {
+                        break;
+                    }
+                    self.eat();
+                }
+                if (is_float and self.index - index < 2) {
+                    // todo: error (only a `.`)
+                    unreachable;
+                }
+                if (is_float) {
+                    return Token.init(.float, self.source[index..self.index]);
+                } else {
+                    return Token.init(.integer, self.source[index..self.index]);
+                }
             },
             '"' => {
                 unreachable;
@@ -207,7 +236,7 @@ pub const Lexer = struct {
             'a'...'z', 'A'...'Z', '_' => {
                 while (true) {
                     const ac = self.peek();
-                    if (ac == 0 or (!std.ascii.isAlphanumeric(ac) and ac != '_')) {
+                    if (ac == 0 or (!isAlphanumeric(ac) and ac != '_')) {
                         break;
                     }
                     self.eat();
@@ -215,7 +244,7 @@ pub const Lexer = struct {
                 return Token.init(.identifier, self.source[index..self.index]);
             },
             else => {
-                if (std.ascii.isWhitespace(c)) {
+                if (isWhitespace(c)) {
                     self.skip_whitespace();
                     return self.next_token();
                 }
