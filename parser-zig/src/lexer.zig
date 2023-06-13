@@ -108,6 +108,9 @@ pub const Lexer = struct {
                 if (ac == '=') {
                     self.eat();
                     break :blk .minus_equal;
+                } else if (ac == '>') {
+                    self.eat();
+                    break :blk .arrow;
                 }
                 break :blk .minus;
             },
@@ -124,6 +127,16 @@ pub const Lexer = struct {
                 if (ac == '=') {
                     self.eat();
                     break :blk .slash_equal;
+                } else if (ac == '/') {
+                    self.eat();
+                    while (true) {
+                        const bc = self.peek();
+                        if (bc == '\n' or bc == 0) {
+                            break;
+                        }
+                        self.eat();
+                    }
+                    return self.next_token();
                 }
                 break :blk .slash;
             },
@@ -251,6 +264,7 @@ pub const TokenType = enum {
     dot,
     dot_dot,
     dot_dot_dot,
+    arrow,
     comma,
     bang,
     and_sign,
@@ -264,7 +278,7 @@ pub const TokenType = enum {
     equal,
     less,
     greater,
-    // --- Double width ---
+    // --- Equal combined ---
     bang_equal,
     and_equal,
     pipe_equal,
