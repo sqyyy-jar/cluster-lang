@@ -38,171 +38,141 @@ pub const Lexer = struct {
         }
     }
 
+    pub fn slice(self: *Self, from: usize) []const u8 {
+        return self.source[from..self.index];
+    }
+
     pub fn next_token(self: *Self) Token {
+        self.skip_whitespace();
         const index = self.index;
         const c = self.peek();
-        switch (c) {
+        self.eat();
+        const token_type: TokenType = switch (c) {
             0 => {
-                return Token.init(.eof, self.source[self.source.len..]);
+                const last_index = self.source.len - 1;
+                return Token.init(.eof, self.source[last_index..last_index]);
             },
-            '(' => {
-                self.eat();
-                return Token.init(.left_paren, self.source[index..self.index]);
-            },
-            ')' => {
-                self.eat();
-                return Token.init(.right_paren, self.source[index..self.index]);
-            },
-            '[' => {
-                self.eat();
-                return Token.init(.left_bracket, self.source[index..self.index]);
-            },
-            ']' => {
-                self.eat();
-                return Token.init(.right_bracket, self.source[index..self.index]);
-            },
-            '{' => {
-                self.eat();
-                return Token.init(.left_brace, self.source[index..self.index]);
-            },
-            '}' => {
-                self.eat();
-                return Token.init(.right_brace, self.source[index..self.index]);
-            },
-            ':' => {
-                self.eat();
-                return Token.init(.colon, self.source[index..self.index]);
-            },
-            ';' => {
-                self.eat();
-                return Token.init(.semicolon, self.source[index..self.index]);
-            },
-            '@' => {
-                self.eat();
-                return Token.init(.at, self.source[index..self.index]);
-            },
-            '#' => {
-                self.eat();
-                return Token.init(.hashtag, self.source[index..self.index]);
-            },
-            ',' => {
-                self.eat();
-                return Token.init(.comma, self.source[index..self.index]);
-            },
-            '!' => {
-                self.eat();
+            '(' => .left_paren,
+            ')' => .right_paren,
+            '[' => .left_bracket,
+            ']' => .right_bracket,
+            '{' => .left_brace,
+            '}' => .right_brace,
+            ':' => .colon,
+            ';' => .semicolon,
+            '@' => .at,
+            '#' => .hashtag,
+            ',' => .comma,
+            '!' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.bang_equal, self.source[index..self.index]);
+                    break :blk .bang_equal;
                 }
-                return Token.init(.bang, self.source[index..self.index]);
+                break :blk .bang;
             },
-            '&' => {
-                self.eat();
+            '&' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.and_equal, self.source[index..self.index]);
+                    break :blk .and_equal;
                 }
-                return Token.init(.and_sign, self.source[index..self.index]);
+                break :blk .and_sign;
             },
-            '|' => {
-                self.eat();
+            '|' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.pipe_equal, self.source[index..self.index]);
+                    break :blk .pipe_equal;
                 }
-                return Token.init(.pipe, self.source[index..self.index]);
+                break :blk .pipe;
             },
-            '^' => {
-                self.eat();
+            '^' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.caret_equal, self.source[index..self.index]);
+                    break :blk .caret_equal;
                 }
-                return Token.init(.caret, self.source[index..self.index]);
+                break :blk .caret;
             },
-            '+' => {
-                self.eat();
+            '+' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.plus_equal, self.source[index..self.index]);
+                    break :blk .plus_equal;
                 }
-                return Token.init(.plus, self.source[index..self.index]);
+                break :blk .plus;
             },
-            '-' => {
-                self.eat();
+            '-' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.minus_equal, self.source[index..self.index]);
+                    break :blk .minus_equal;
                 }
-                return Token.init(.minus, self.source[index..self.index]);
+                break :blk .minus;
             },
-            '*' => {
-                self.eat();
+            '*' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.star_equal, self.source[index..self.index]);
+                    break :blk .star_equal;
                 }
-                return Token.init(.star, self.source[index..self.index]);
+                break :blk .star;
             },
-            '/' => {
-                self.eat();
+            '/' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.slash_equal, self.source[index..self.index]);
+                    break :blk .slash_equal;
                 }
-                return Token.init(.slash, self.source[index..self.index]);
+                break :blk .slash;
             },
-            '%' => {
-                self.eat();
+            '%' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.percent_equal, self.source[index..self.index]);
+                    break :blk .percent_equal;
                 }
-                return Token.init(.percent, self.source[index..self.index]);
+                break :blk .percent;
             },
-            '=' => {
-                self.eat();
+            '=' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.equal_equal, self.source[index..self.index]);
+                    break :blk .equal_equal;
                 }
-                return Token.init(.equal, self.source[index..self.index]);
+                break :blk .equal;
             },
-            '<' => {
-                self.eat();
+            '<' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.less_equal, self.source[index..self.index]);
+                    break :blk .less_equal;
                 }
-                return Token.init(.less, self.source[index..self.index]);
+                break :blk .less;
             },
-            '>' => {
-                self.eat();
+            '>' => blk: {
                 const ac = self.peek();
                 if (ac == '=') {
                     self.eat();
-                    return Token.init(.greater_equal, self.source[index..self.index]);
+                    break :blk .greater_equal;
                 }
-                return Token.init(.greater, self.source[index..self.index]);
+                break :blk .greater;
             },
-            '.', '0'...'9' => {
+            '.', '0'...'9' => blk: {
                 var is_float = c == '.';
-                self.eat();
                 const ac = self.peek();
+                if (c == '.' and ac == '.') {
+                    self.eat();
+                    const bc = self.peek();
+                    if (bc == '.') {
+                        self.eat();
+                        break :blk .dot_dot_dot;
+                    }
+                    break :blk .dot_dot;
+                }
                 if (is_float and !isDigit(ac)) {
-                    return Token.init(.dot, self.source[index..self.index]);
+                    break :blk .dot;
                 }
                 while (true) {
                     const bc = self.peek();
@@ -225,15 +195,15 @@ pub const Lexer = struct {
                     unreachable;
                 }
                 if (is_float) {
-                    return Token.init(.float, self.source[index..self.index]);
+                    break :blk .float;
                 } else {
-                    return Token.init(.integer, self.source[index..self.index]);
+                    break :blk .integer;
                 }
             },
             '"' => {
                 unreachable;
             },
-            'a'...'z', 'A'...'Z', '_' => {
+            'a'...'z', 'A'...'Z', '_' => blk: {
                 while (true) {
                     const ac = self.peek();
                     if (ac == 0 or (!isAlphanumeric(ac) and ac != '_')) {
@@ -241,16 +211,13 @@ pub const Lexer = struct {
                     }
                     self.eat();
                 }
-                return Token.init(.identifier, self.source[index..self.index]);
+                break :blk .identifier;
             },
             else => {
-                if (isWhitespace(c)) {
-                    self.skip_whitespace();
-                    return self.next_token();
-                }
                 unreachable;
             },
-        }
+        };
+        return Token.init(token_type, self.slice(index));
     }
 };
 
@@ -282,6 +249,8 @@ pub const TokenType = enum {
     at,
     hashtag,
     dot,
+    dot_dot,
+    dot_dot_dot,
     comma,
     bang,
     and_sign,
