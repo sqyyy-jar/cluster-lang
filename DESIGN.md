@@ -28,10 +28,8 @@
 ## Ideas
 
 ```rs
-module test;
-
-// Maybe change this
-submodule util;
+// A module from another file
+module util;
 
 import std:{io.println, math.sqrt};
 
