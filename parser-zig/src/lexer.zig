@@ -19,6 +19,7 @@ pub const LexerError = error{
     UnexpectedEof,
     InvalidEscapeSequence,
     InvalidFloat,
+    InvalidToken,
 };
 
 pub const Lexer = struct {
@@ -289,9 +290,7 @@ pub const Lexer = struct {
                 }
                 break :blk .identifier;
             },
-            else => {
-                unreachable;
-            },
+            else => return error.InvalidToken,
         };
         return Token.init(token_type, self.slice(index));
     }
