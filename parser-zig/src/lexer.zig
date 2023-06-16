@@ -15,6 +15,12 @@ const ident_map = std.ComptimeStringMap(TokenType, .{ //
     .{ "return", .kw_return },
 });
 
+pub const LexerError = error{
+    UnexpectedEof,
+    InvalidEscapeSequence,
+    InvalidFloat,
+};
+
 pub const Lexer = struct {
     const Self = @This();
 
@@ -39,7 +45,7 @@ pub const Lexer = struct {
         self.index += 1;
     }
 
-    pub fn skip_whitespace(self: *Self) void {
+    pub fn skipWhitespace(self: *Self) void {
         while (true) {
             const c = self.peek();
             if (isWhitespace(c)) {
@@ -54,8 +60,8 @@ pub const Lexer = struct {
         return self.source[from..self.index];
     }
 
-    pub fn next_token(self: *Self) Token {
-        self.skip_whitespace();
+    pub fn nextToken(self: *Self) LexerError!Token {
+        self.skipWhitespace();
         const index = self.index;
         const c = self.peek();
         self.eat();
@@ -148,7 +154,7 @@ pub const Lexer = struct {
                         }
                         self.eat();
                     }
-                    return self.next_token();
+                    return self.nextToken();
                 }
                 break :blk .slash;
             },
@@ -203,8 +209,7 @@ pub const Lexer = struct {
                     const bc = self.peek();
                     if (bc == '.') {
                         if (is_float) {
-                            // todo: error (float with >1 dot)
-                            unreachable;
+                            return error.InvalidFloat;
                         }
                         self.eat();
                         is_float = true;
@@ -216,8 +221,7 @@ pub const Lexer = struct {
                     self.eat();
                 }
                 if (is_float and self.index - index < 2) {
-                    // todo: error (only a `.`)
-                    unreachable;
+                    break :blk .dot;
                 }
                 if (is_float) {
                     break :blk .float;
@@ -229,12 +233,39 @@ pub const Lexer = struct {
                 while (true) {
                     const ac = self.peek();
                     if (ac == 0) {
-                        // todo: error
-                        unreachable;
+                        return error.UnexpectedEof;
                     }
                     if (ac == '\\') {
-                        // todo: error
-                        unreachable;
+                        self.eat();
+                        const bc = self.peek();
+                        switch (bc) {
+                            '"', '\\', 'n', 'r', 't' => self.eat(),
+                            'x' => {
+                                self.eat();
+                                const cc = self.peek();
+                                if (cc == 0) {
+                                    return error.UnexpectedEof;
+                                }
+                                switch (cc) {
+                                    '0'...'9', 'a'...'f', 'A'...'F' => {
+                                        self.eat();
+                                    },
+                                    else => return error.InvalidEscapeSequence,
+                                }
+                                const dc = self.peek();
+                                if (dc == 0) {
+                                    return error.UnexpectedEof;
+                                }
+                                switch (dc) {
+                                    '0'...'9', 'a'...'f', 'A'...'F' => {
+                                        self.eat();
+                                    },
+                                    else => return error.InvalidEscapeSequence,
+                                }
+                            },
+                            else => return error.InvalidEscapeSequence,
+                        }
+                        continue;
                     }
                     if (ac == '"') {
                         self.eat();

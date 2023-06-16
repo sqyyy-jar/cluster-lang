@@ -8,9 +8,8 @@ test "debug lexer" {
         \\  println("Hello world!");
         \\}
     );
-    std.debug.print("len: {}", .{lex.source.len});
     while (true) {
-        const elem = lex.next_token();
+        const elem = try lex.nextToken();
         std.debug.print("Token: {any} '{s}'\n", .{ elem.type, elem.slice });
         if (elem.type == .eof) {
             break;
