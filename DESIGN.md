@@ -37,10 +37,10 @@ trait Length {
     fun length(self) -> float;
 }
 
-// Maybe change up this syntax
 enum Number {
-    integer: int;
-    float: float;
+    integer(int);
+    float(float);
+    none;
 }
 
 struct Vec3 {
@@ -66,9 +66,7 @@ struct Vec3 {
     }
 }
 
-// Maybe use `impl` or `implement` instead
-// Maybe swap `Vec3` and `Length` and replace `:` with `for` in between
-derive Vec3 : Length {
+impl Vec3 : Length {
     fun len(self) -> float {
         return sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
     }
