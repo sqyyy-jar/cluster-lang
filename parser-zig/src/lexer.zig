@@ -3,6 +3,18 @@ const isWhitespace = std.ascii.isWhitespace;
 const isDigit = std.ascii.isDigit;
 const isAlphanumeric = std.ascii.isAlphanumeric;
 
+const ident_map = std.ComptimeStringMap(TokenType, .{ //
+    .{ "module", .kw_module },
+    .{ "import", .kw_import },
+    .{ "trait", .kw_trait },
+    .{ "struct", .kw_struct },
+    .{ "enum", .kw_enum },
+    .{ "fun", .kw_fun },
+    .{ "const", .kw_const },
+    .{ "let", .kw_let },
+    .{ "return", .kw_return },
+});
+
 pub const Lexer = struct {
     const Self = @This();
 
@@ -213,8 +225,24 @@ pub const Lexer = struct {
                     break :blk .integer;
                 }
             },
-            '"' => {
-                unreachable;
+            '"' => blk: {
+                while (true) {
+                    const ac = self.peek();
+                    if (ac == 0) {
+                        // todo: error
+                        unreachable;
+                    }
+                    if (ac == '\\') {
+                        // todo: error
+                        unreachable;
+                    }
+                    if (ac == '"') {
+                        self.eat();
+                        break;
+                    }
+                    self.eat();
+                }
+                break :blk .string;
             },
             'a'...'z', 'A'...'Z', '_' => blk: {
                 while (true) {
@@ -223,6 +251,10 @@ pub const Lexer = struct {
                         break;
                     }
                     self.eat();
+                }
+                const ident = self.slice(index);
+                if (ident_map.get(ident)) |token_type| {
+                    break :blk token_type;
                 }
                 break :blk .identifier;
             },
@@ -296,5 +328,17 @@ pub const TokenType = enum {
     float,
     string,
     identifier,
+    // --- Keywords ---
+    kw_module,
+    kw_import,
+    kw_pub,
+    kw_trait,
+    kw_struct,
+    kw_enum,
+    kw_derive,
+    kw_fun,
+    kw_const,
+    kw_let,
+    kw_return,
     eof,
 };

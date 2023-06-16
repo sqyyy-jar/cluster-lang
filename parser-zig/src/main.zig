@@ -4,8 +4,9 @@ pub const lexer = @import("./lexer.zig");
 
 test "debug lexer" {
     var lex = lexer.Lexer.init(
-        \\let y = 2 * x; // this does work
-        \\y += 3;
+        \\fun test() {
+        \\  println("Hello world!");
+        \\}
     );
     std.debug.print("len: {}", .{lex.source.len});
     while (true) {
