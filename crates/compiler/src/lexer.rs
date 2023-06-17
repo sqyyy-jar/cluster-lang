@@ -144,7 +144,7 @@ impl Lexer {
         &self.source[slice.0..slice.1]
     }
 
-    pub fn next_token(&mut self) -> Result<Option<Token>, ()> {
+    pub fn next_token(&mut self) -> Result<Option<Token>> {
         loop {
             self.skip_whitespace();
             let index = self.index;
@@ -288,7 +288,7 @@ impl Lexer {
                     while let Some(bc) = self.peek() {
                         if bc == '.' {
                             if is_float {
-                                todo!("Invalid float")
+                                return Err(Error::InvalidFloat);
                             }
                             is_float = true;
                             self.eat();
@@ -309,34 +309,34 @@ impl Lexer {
                     loop {
                         let ac = self.peek();
                         if ac.is_none() {
-                            todo!("Unexpected eof")
+                            return Err(Error::UnexpectedEof);
                         }
                         let ac = ac.unwrap();
                         if ac == '\\' {
                             self.eat();
                             let Some(bc) = self.peek() else {
-                                todo!("Unexpected eof")
+                                return Err(Error::UnexpectedEof);
                             };
                             match bc {
                                 '"' | '\\' | 'n' | 't' | 'r' => self.eat(),
                                 'x' => {
                                     self.eat();
                                     let Some(cc) = self.peek() else {
-                                        todo!("Invalid escape sequence")
+                                        return Err(Error::UnexpectedEof);
                                     };
                                     if !matches!(cc, '0'..='9' | 'a'..='f' | 'A'..='F') {
-                                        todo!("Invalid escape sequence")
+                                        return Err(Error::InvalidEscapeSequence);
                                     }
                                     self.eat();
                                     let Some(dc) = self.peek() else {
-                                        todo!("Invalid escape sequence")
+                                        return Err(Error::UnexpectedEof);
                                     };
                                     if !matches!(dc, '0'..='9' | 'a'..='f' | 'A'..='F') {
-                                        todo!("Invalid escape sequence")
+                                        return Err(Error::InvalidEscapeSequence);
                                     }
                                     self.eat();
                                 }
-                                _ => todo!("Invalid escape sequence"),
+                                _ => return Err(Error::InvalidEscapeSequence),
                             }
                             continue;
                         }
@@ -361,7 +361,7 @@ impl Lexer {
                         TokenType::Identifier
                     }
                 }
-                _ => todo!(),
+                _ => return Err(Error::InvalidToken),
             };
             return Ok(Some(Token::new(token_type, Str(index, self.index))));
         }

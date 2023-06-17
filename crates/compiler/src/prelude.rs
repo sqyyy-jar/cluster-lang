@@ -1,1 +1,4 @@
-pub use crate::util::Str;
+pub use crate::{
+    error::{Error, Result},
+    util::Str,
+};
