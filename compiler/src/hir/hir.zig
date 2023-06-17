@@ -1,7 +1,6 @@
-const std = @import("std");
-const lexer = @import("../lexer.zig");
-
-pub const HirError = error{} || lexer.LexerError;
+const m = @import("../mods.zig");
+const std = m.std;
+const lexer = m.lexer;
 
 pub const Hir = struct {
     const Self = @This();
@@ -10,6 +9,15 @@ pub const Hir = struct {
     imports: std.ArrayList(HirImport),
     types: std.ArrayList(HirTypeDecl),
     functions: std.ArrayList(HirFunction),
+
+    pub fn init(alloc: std.mem.Allocator) Self {
+        return Self{
+            .modules = std.ArrayList(HirModule).init(alloc),
+            .imports = std.ArrayList(HirImport).init(alloc),
+            .types = std.ArrayList(HirTypeDecl).init(alloc),
+            .functions = std.ArrayList(HirFunction).init(alloc),
+        };
+    }
 };
 
 // todo
@@ -27,6 +35,8 @@ pub const HirModule = struct {
 pub const HirImport = struct {
     name: []const u8,
 };
+
+pub const HirImportNode = struct {};
 
 // todo
 pub const HirTypeDecl = union(enum) {

@@ -1,7 +1,9 @@
-const std = @import("std");
+const m = @import("./mods.zig");
+const std = m.std;
 const isWhitespace = std.ascii.isWhitespace;
 const isDigit = std.ascii.isDigit;
 const isAlphanumeric = std.ascii.isAlphanumeric;
+const util = m.util;
 
 const ident_map = std.ComptimeStringMap(TokenType, .{ //
     .{ "module", .kw_module },
@@ -20,13 +22,6 @@ const ident_map = std.ComptimeStringMap(TokenType, .{ //
     .{ "continue", .kw_continue },
     .{ "break", .kw_break },
 });
-
-pub const LexerError = error{
-    UnexpectedEof,
-    InvalidEscapeSequence,
-    InvalidFloat,
-    InvalidToken,
-};
 
 pub const Lexer = struct {
     const Self = @This();
@@ -67,7 +62,7 @@ pub const Lexer = struct {
         return self.source[from..self.index];
     }
 
-    pub fn nextToken(self: *Self) LexerError!?Token {
+    pub fn nextToken(self: *Self) util.Error!?Token {
         self.skipWhitespace();
         const index = self.index;
         const c = self.peek();
