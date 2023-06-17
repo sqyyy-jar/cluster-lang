@@ -61,16 +61,15 @@ pub const Lexer = struct {
         return self.source[from..self.index];
     }
 
-    pub fn nextToken(self: *Self) LexerError!Token {
+    pub fn nextToken(self: *Self) LexerError!?Token {
         self.skipWhitespace();
         const index = self.index;
         const c = self.peek();
         self.eat();
         const token_type: TokenType = switch (c) {
-            0 => {
-                const last_index = self.source.len - 1;
-                return Token.init(.eof, self.source[last_index..last_index]);
-            },
+            0 => return null,
+            // const last_index = self.source.len - 1;
+            // return Token.init(.eof, self.source[last_index..last_index]);
             '(' => .left_paren,
             ')' => .right_paren,
             '[' => .left_bracket,
@@ -370,5 +369,5 @@ pub const TokenType = enum {
     kw_const,
     kw_let,
     kw_return,
-    eof,
+    // eof,
 };

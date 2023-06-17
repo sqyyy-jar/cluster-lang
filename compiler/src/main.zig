@@ -1,6 +1,6 @@
 const std = @import("std");
+const lexer = @import("./lexer.zig");
 const testing = std.testing;
-pub const lexer = @import("./lexer.zig");
 
 test "debug lexer" {
     var lex = lexer.Lexer.init(
@@ -8,12 +8,8 @@ test "debug lexer" {
         \\  println("Hello world!");
         \\}
     );
-    while (true) {
-        const elem = try lex.nextToken();
-        // std.debug.print("Token: {any} '{s}'\n", .{ elem.type, elem.slice });
-        if (elem.type == .eof) {
-            break;
-        }
+    while (try lex.nextToken()) |tok| {
+        std.debug.print("Token: {any} '{s}'\n", .{ tok.type, tok.slice });
     }
 }
 
