@@ -1,2 +1,3 @@
-#[derive(Clone, Copy)]
-pub struct Str(pub usize, pub usize);
+/// (start, length)
+#[derive(Clone, Copy, Debug)]
+pub struct Str(pub u32, pub u32);

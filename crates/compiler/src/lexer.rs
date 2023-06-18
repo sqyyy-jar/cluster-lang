@@ -34,7 +34,7 @@ impl Token {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TokenType {
     // Brackets
     LeftParen,
@@ -104,7 +104,7 @@ pub enum TokenType {
 
 pub struct Lexer {
     source: Rc<str>,
-    index: usize,
+    index: u32,
 }
 
 impl Lexer {
@@ -113,22 +113,22 @@ impl Lexer {
     }
 
     pub fn has_next(&self) -> bool {
-        self.index < self.source.len()
+        self.index < self.source.len() as u32
     }
 
     pub fn peek(&self) -> Option<char> {
-        self.source.get(self.index..)?.chars().next()
+        self.source.get(self.index as usize..)?.chars().next()
     }
 
     pub fn eat(&mut self) {
         self.index += self
             .source
-            .get(self.index..)
+            .get(self.index as usize..)
             .unwrap()
             .chars()
             .next()
             .unwrap()
-            .len_utf8();
+            .len_utf8() as u32;
     }
 
     pub fn skip_whitespace(&mut self) {
@@ -141,7 +141,7 @@ impl Lexer {
     }
 
     pub fn slice(&self, slice: Str) -> &str {
-        &self.source[slice.0..slice.1]
+        &self.source[slice.0 as usize..(slice.0 + slice.1) as usize]
     }
 
     pub fn next_token(&mut self) -> Result<Option<Token>> {
@@ -354,7 +354,7 @@ impl Lexer {
                         }
                         self.eat();
                     }
-                    let ident = self.slice(Str(index, self.index));
+                    let ident = self.slice(Str(index, self.index - index));
                     if let Some(kw) = KEYWORDS.get(ident) {
                         *kw
                     } else {
@@ -363,7 +363,7 @@ impl Lexer {
                 }
                 _ => return Err(Error::InvalidToken),
             };
-            return Ok(Some(Token::new(token_type, Str(index, self.index))));
+            return Ok(Some(Token::new(token_type, Str(index, self.index - index))));
         }
     }
 }

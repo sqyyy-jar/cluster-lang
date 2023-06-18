@@ -1,5 +1,8 @@
+pub mod parser;
+
 use crate::prelude::*;
 
+#[derive(Debug)]
 pub struct Hir {
     pub modules: Vec<HirModule>,
     pub imports: Vec<HirImport>,
@@ -18,16 +21,22 @@ impl Default for Hir {
     }
 }
 
+#[derive(Debug)]
 pub struct HirType {
     pub name: Str,
 }
 
+#[derive(Debug)]
 pub struct HirModule {
     pub name: Str,
 }
 
-pub struct HirImport {}
+#[derive(Debug)]
+pub struct HirImport {
+    pub parts: Vec<Str>,
+}
 
+#[derive(Debug)]
 pub enum HirTypeDecl {
     Trait {
         name: Str,
@@ -45,6 +54,7 @@ pub enum HirTypeDecl {
     },
 }
 
+#[derive(Debug)]
 pub struct HirFunction {
     pub name: Str,
     pub params: Vec<HirFunctionParam>,
@@ -52,23 +62,28 @@ pub struct HirFunction {
     pub body: Option<HirBlock>,
 }
 
+#[derive(Debug)]
 pub struct HirFunctionParam {
     pub name: Str,
     pub r#type: HirType,
 }
 
+#[derive(Debug)]
 pub struct HirStructField {
     pub name: Str,
     pub r#type: Str,
 }
 
+#[derive(Debug)]
 pub struct HirEnumVariant {
     pub name: Str,
     pub r#type: Option<HirType>,
 }
 
+#[derive(Debug)]
 pub struct HirBlock {
     pub statements: Vec<HirStatement>,
 }
 
+#[derive(Debug)]
 pub enum HirStatement {}
