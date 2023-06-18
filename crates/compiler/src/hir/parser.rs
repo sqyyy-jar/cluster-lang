@@ -1,11 +1,12 @@
 use std::rc::Rc;
 
 use crate::{
+    hir::HirFunction,
     lexer::{Lexer, Token, TokenType},
     prelude::*,
 };
 
-use super::{Hir, HirImport, HirModule};
+use super::{Hir, HirBlock, HirFunctionParam, HirImport, HirModule, HirType};
 
 pub struct Parser {
     pub errors: Vec<Error>,
@@ -46,12 +47,25 @@ impl Parser {
     }
 
     pub fn peek(&mut self) -> Result<Token> {
+        if let Some(tok) = self.peek_buf {
+            return Ok(tok);
+        }
         let tok = self
             .lex
             .next_token()
             .and_then(|it| it.ok_or(Error::UnexpectedEof))?;
         self.peek_buf = Some(tok);
         Ok(tok)
+    }
+
+    pub fn maybe(&mut self, token_type: TokenType) -> Result<Option<Token>> {
+        let tok = self.peek()?;
+        Ok(if tok.r#type == token_type {
+            self.expect_one()?;
+            Some(tok)
+        } else {
+            None
+        })
     }
 
     pub fn parse(&mut self) -> Result<()> {
@@ -67,6 +81,14 @@ impl Parser {
                     self.parse_import(&mut buf)?;
                     self.expect(TokenType::Semicolon)?;
                 }
+                TokenType::KwPub => {
+                    let next = self.expect_one()?;
+                    match next.r#type {
+                        TokenType::KwFun => self.parse_function(true)?,
+                        _ => return Err(Error::UnexpectedToken),
+                    }
+                }
+                TokenType::KwFun => self.parse_function(false)?,
                 _ => {
                     eprintln!(
                         "UNHANDLED TOKEN: {:?} {:?}",
@@ -77,6 +99,11 @@ impl Parser {
             }
         }
         Ok(())
+    }
+
+    fn parse_type(&mut self) -> Result<HirType> {
+        let name = self.expect(TokenType::Identifier)?;
+        Ok(HirType { name: name.slice })
     }
 
     fn parse_import(&mut self, buf: &mut Vec<Str>) -> Result<()> {
@@ -110,5 +137,54 @@ impl Parser {
             }
         }
         Ok(())
+    }
+
+    fn parse_function(&mut self, public: bool) -> Result<()> {
+        let name = self.expect(TokenType::Identifier)?;
+        // generics
+        self.expect(TokenType::LeftParen)?;
+        let params = self.parse_function_params()?;
+        self.expect(TokenType::RightParen)?;
+        let return_type = if self.maybe(TokenType::Arrow)?.is_some() {
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+        let body = if self.maybe(TokenType::Semicolon)?.is_some() {
+            None
+        } else {
+            Some(self.parse_block()?)
+        };
+        self.ast.functions.push(HirFunction {
+            name: name.slice,
+            public,
+            params,
+            return_type,
+            body,
+        });
+        Ok(())
+    }
+
+    fn parse_function_params(&mut self) -> Result<Vec<HirFunctionParam>> {
+        let mut params = Vec::with_capacity(0);
+        loop {
+            if self.peek()?.r#type == TokenType::RightParen {
+                break;
+            }
+            let r#type = self.parse_type()?;
+            let name = self.expect(TokenType::Identifier)?;
+            params.push(HirFunctionParam {
+                name: name.slice,
+                r#type,
+            });
+            if self.peek()?.r#type != TokenType::Comma {
+                break;
+            }
+        }
+        Ok(params)
+    }
+
+    fn parse_block(&mut self) -> Result<HirBlock> {
+        todo!()
     }
 }

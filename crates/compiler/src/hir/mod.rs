@@ -57,6 +57,7 @@ pub enum HirTypeDecl {
 #[derive(Debug)]
 pub struct HirFunction {
     pub name: Str,
+    pub public: bool,
     pub params: Vec<HirFunctionParam>,
     pub return_type: Option<HirType>,
     pub body: Option<HirBlock>,
