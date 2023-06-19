@@ -20,9 +20,11 @@ pub const KEYWORDS: Map<&str, TokenType> = phf_map! {
     "return" => TokenType::KwReturn,
     "continue" => TokenType::KwContinue,
     "break" => TokenType::KwBreak,
+    "and" => TokenType::KwAnd,
+    "or" => TokenType::KwOr,
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Token {
     pub r#type: TokenType,
     pub slice: Str,
@@ -53,6 +55,7 @@ pub enum TokenType {
     DotDotDot,
     Arrow,
     Comma,
+    // Operators
     Bang,
     And,
     Pipe,
@@ -65,7 +68,7 @@ pub enum TokenType {
     Equal,
     Less,
     Greater,
-    // Equal combined
+    // Combined
     BangEqual,
     AndEqual,
     PipeEqual,
@@ -78,6 +81,8 @@ pub enum TokenType {
     EqualEqual,
     LessEqual,
     GreaterEqual,
+    LessLess,
+    GreaterGreater,
     // Literals
     Integer,
     Float,
@@ -100,6 +105,8 @@ pub enum TokenType {
     KwReturn,
     KwContinue,
     KwBreak,
+    KwAnd,
+    KwOr,
 }
 
 pub struct Lexer {
@@ -253,22 +260,28 @@ impl Lexer {
                         TokenType::Equal
                     }
                 }
-                '<' => {
-                    if let Some('=') = self.peek() {
+                '<' => match self.peek() {
+                    Some('=') => {
                         self.eat();
                         TokenType::LessEqual
-                    } else {
-                        TokenType::Less
                     }
-                }
-                '>' => {
-                    if let Some('=') = self.peek() {
+                    Some('<') => {
                         self.eat();
-                        TokenType::GreaterEqual
-                    } else {
-                        TokenType::Greater
+                        TokenType::LessLess
                     }
-                }
+                    _ => TokenType::Less,
+                },
+                '>' => match self.peek() {
+                    Some('=') => {
+                        self.eat();
+                        TokenType::LessEqual
+                    }
+                    Some('>') => {
+                        self.eat();
+                        TokenType::GreaterGreater
+                    }
+                    _ => TokenType::Greater,
+                },
                 '.' | '0'..='9' => 'blk: {
                     let mut is_float = c == '.';
                     let ac = self.peek();

@@ -6,7 +6,9 @@ use crate::{
     prelude::*,
 };
 
-use super::{Hir, HirBlock, HirFunctionParam, HirImport, HirModule, HirType};
+use super::{
+    Hir, HirBlock, HirFunctionParam, HirImport, HirModule, HirPath, HirStatement, HirType,
+};
 
 pub struct Parser {
     pub errors: Vec<Error>,
@@ -119,7 +121,9 @@ impl Parser {
                 self.expect_one()?;
                 self.parse_import_group(buf)?;
             }
-            _ => self.ast.imports.push(HirImport { parts: buf.clone() }),
+            _ => self.ast.imports.push(HirImport {
+                path: HirPath { parts: buf.clone() },
+            }),
         }
         buf.pop().unwrap();
         Ok(())
@@ -185,6 +189,15 @@ impl Parser {
     }
 
     fn parse_block(&mut self) -> Result<HirBlock> {
+        self.expect(TokenType::LeftBrace)?;
+        let mut statements = Vec::new();
+        while self.maybe(TokenType::RightBrace)?.is_none() {
+            statements.push(self.parse_statement()?);
+        }
+        Ok(HirBlock { statements })
+    }
+
+    fn parse_statement(&mut self) -> Result<HirStatement> {
         todo!()
     }
 }

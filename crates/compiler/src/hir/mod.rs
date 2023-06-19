@@ -1,6 +1,6 @@
 pub mod parser;
 
-use crate::prelude::*;
+use crate::{lexer::Token, prelude::*};
 
 #[derive(Debug)]
 pub struct Hir {
@@ -27,13 +27,18 @@ pub struct HirType {
 }
 
 #[derive(Debug)]
+pub struct HirPath {
+    pub parts: Vec<Str>,
+}
+
+#[derive(Debug)]
 pub struct HirModule {
     pub name: Str,
 }
 
 #[derive(Debug)]
 pub struct HirImport {
-    pub parts: Vec<Str>,
+    pub path: HirPath,
 }
 
 #[derive(Debug)]
@@ -87,4 +92,72 @@ pub struct HirBlock {
 }
 
 #[derive(Debug)]
-pub enum HirStatement {}
+pub enum HirStatement {
+    VarDecl {
+        name: Str,
+        r#type: Option<HirType>,
+        expr: Option<HirExpression>,
+    },
+    ConstDecl {
+        name: Str,
+        r#type: Option<HirType>,
+        expr: Option<HirExpression>,
+    },
+    Assign {
+        name: Str,
+        expr: HirExpression,
+    },
+    If {
+        cond: HirExpression,
+        block: HirBlock,
+    },
+    While {
+        cond: HirExpression,
+        block: HirBlock,
+    },
+    For {
+        name: Str,
+        expr: HirExpression,
+        block: HirBlock,
+    },
+    Call {},
+    DotCall {},
+}
+
+#[derive(Debug)]
+pub enum HirExpression {
+    Int {
+        slice: Str,
+    },
+    Float {
+        slice: Str,
+    },
+    String {
+        slice: Str,
+    },
+    /// `sum(x)` with `x`
+    Access {
+        name: Str,
+    },
+    /// `sum(x.y)` with `x` and `y`
+    DotAccess {
+        expr: Box<HirExpression>,
+        name: Str,
+    },
+    Call {
+        name: Str,
+        // todo
+    },
+    DotCall {
+        expr: Box<HirExpression>,
+        // todo
+    },
+    UnaryOp {
+        op: Token,
+        arg: Box<HirExpression>,
+    },
+    BinaryOp {
+        op: Token,
+        args: Box<[HirExpression; 2]>,
+    },
+}
