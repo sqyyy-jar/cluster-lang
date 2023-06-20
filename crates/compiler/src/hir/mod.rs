@@ -93,35 +93,45 @@ pub struct HirBlock {
 
 #[derive(Debug)]
 pub enum HirStatement {
+    /// `var name: type = expr;`
     VarDecl {
         name: Str,
         r#type: Option<HirType>,
         expr: Option<HirExpression>,
     },
+    /// `const name: type = expr;`
     ConstDecl {
         name: Str,
         r#type: Option<HirType>,
         expr: Option<HirExpression>,
     },
+    /// `expr = value;`
     Assign {
-        name: Str,
         expr: HirExpression,
+        value: HirExpression,
     },
+    /// `if cond block else else_block`
     If {
         cond: HirExpression,
         block: HirBlock,
+        else_block: Option<HirBlock>,
     },
+    /// `while cond block`
     While {
         cond: HirExpression,
         block: HirBlock,
     },
+    /// `for name in expr block`
     For {
         name: Str,
         expr: HirExpression,
         block: HirBlock,
     },
-    Call {},
-    DotCall {},
+    /// `expr(args);`
+    Call {
+        expr: HirExpression,
+        args: Vec<HirExpression>,
+    },
 }
 
 #[derive(Debug)]
@@ -135,27 +145,26 @@ pub enum HirExpression {
     String {
         slice: Str,
     },
-    /// `sum(x)` with `x`
+    /// `name`
     Access {
         name: Str,
     },
-    /// `sum(x.y)` with `x` and `y`
+    /// `expr.name`
     DotAccess {
         expr: Box<HirExpression>,
         name: Str,
     },
+    /// `expr(args)`
     Call {
-        name: Str,
-        // todo
-    },
-    DotCall {
         expr: Box<HirExpression>,
-        // todo
+        args: Vec<HirExpression>,
     },
+    /// `op arg`
     UnaryOp {
         op: Token,
         arg: Box<HirExpression>,
     },
+    /// `args[0] op args[1]`
     BinaryOp {
         op: Token,
         args: Box<[HirExpression; 2]>,

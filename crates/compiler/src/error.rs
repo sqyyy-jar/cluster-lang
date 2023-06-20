@@ -4,7 +4,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     UnexpectedEof,
     UnexpectedToken,
+    UnexpectedExpression,
     InvalidEscapeSequence,
     InvalidFloat,
     InvalidToken,
+    InvalidUnaryExpression,
+    InvalidBinaryExpression,
 }

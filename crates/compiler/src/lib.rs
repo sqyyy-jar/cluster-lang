@@ -20,7 +20,9 @@ module test;
 
 import a:{b, c.d};
 
-fun main() {}
+fun main() {
+    a = 2;
+}
         "#,
         ));
         parser.parse().expect("Parse");

@@ -7,7 +7,8 @@ use crate::{
 };
 
 use super::{
-    Hir, HirBlock, HirFunctionParam, HirImport, HirModule, HirPath, HirStatement, HirType,
+    Hir, HirBlock, HirExpression, HirFunctionParam, HirImport, HirModule, HirPath, HirStatement,
+    HirType,
 };
 
 pub struct Parser {
@@ -144,7 +145,7 @@ impl Parser {
     }
 
     fn parse_function(&mut self, public: bool) -> Result<()> {
-        let name = self.expect(TokenType::Identifier)?;
+        let name = self.expect(TokenType::Identifier)?.slice;
         // generics
         self.expect(TokenType::LeftParen)?;
         let params = self.parse_function_params()?;
@@ -160,7 +161,7 @@ impl Parser {
             Some(self.parse_block()?)
         };
         self.ast.functions.push(HirFunction {
-            name: name.slice,
+            name,
             public,
             params,
             return_type,
@@ -176,11 +177,8 @@ impl Parser {
                 break;
             }
             let r#type = self.parse_type()?;
-            let name = self.expect(TokenType::Identifier)?;
-            params.push(HirFunctionParam {
-                name: name.slice,
-                r#type,
-            });
+            let name = self.expect(TokenType::Identifier)?.slice;
+            params.push(HirFunctionParam { name, r#type });
             if self.peek()?.r#type != TokenType::Comma {
                 break;
             }
@@ -198,6 +196,159 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<HirStatement> {
-        todo!()
+        let tok = self.peek()?;
+        match tok.r#type {
+            TokenType::KwVar => {
+                self.expect_one()?;
+                let name = self.expect(TokenType::Identifier)?.slice;
+                let r#type = if self.maybe(TokenType::Colon)?.is_some() {
+                    Some(self.parse_type()?)
+                } else {
+                    None
+                };
+                let expr = if self.maybe(TokenType::Equal)?.is_some() {
+                    Some(self.parse_expression()?)
+                } else {
+                    None
+                };
+                self.expect(TokenType::Semicolon)?;
+                Ok(HirStatement::VarDecl { name, r#type, expr })
+            }
+            TokenType::KwConst => {
+                self.expect_one()?;
+                let name = self.expect(TokenType::Identifier)?.slice;
+                let r#type = if self.maybe(TokenType::Colon)?.is_some() {
+                    Some(self.parse_type()?)
+                } else {
+                    None
+                };
+                let expr = if self.maybe(TokenType::Equal)?.is_some() {
+                    Some(self.parse_expression()?)
+                } else {
+                    None
+                };
+                self.expect(TokenType::Semicolon)?;
+                Ok(HirStatement::ConstDecl { name, r#type, expr })
+            }
+            TokenType::KwIf => {
+                self.expect_one()?;
+                let cond = self.parse_expression()?;
+                let block = self.parse_block()?;
+                // todo: add else and elseif
+                Ok(HirStatement::If {
+                    cond,
+                    block,
+                    else_block: None,
+                })
+            }
+            TokenType::KwWhile => {
+                self.expect_one()?;
+                let cond = self.parse_expression()?;
+                let block = self.parse_block()?;
+                Ok(HirStatement::While { cond, block })
+            }
+            TokenType::KwFor => {
+                self.expect_one()?;
+                let name = self.expect(TokenType::Identifier)?.slice;
+                self.expect(TokenType::KwIn)?;
+                let expr = self.parse_expression()?;
+                let block = self.parse_block()?;
+                Ok(HirStatement::For { name, expr, block })
+            }
+            _ => {
+                let expr = self.parse_expression()?;
+                match expr {
+                    HirExpression::Call { expr, args } => {
+                        self.expect(TokenType::Semicolon)?;
+                        Ok(HirStatement::Call { expr: *expr, args })
+                    }
+                    HirExpression::Access { .. } => {
+                        self.expect(TokenType::Equal)?;
+                        let value = self.parse_expression()?;
+                        self.expect(TokenType::Semicolon)?;
+                        Ok(HirStatement::Assign { expr, value })
+                    }
+                    HirExpression::DotAccess { .. } => {
+                        self.expect(TokenType::Equal)?;
+                        let value = self.parse_expression()?;
+                        self.expect(TokenType::Semicolon)?;
+                        Ok(HirStatement::Assign { expr, value })
+                    }
+                    _ => Err(Error::UnexpectedExpression),
+                }
+            }
+        }
+    }
+
+    fn parse_expression(&mut self) -> Result<HirExpression> {
+        let next = self.peek()?;
+        let left = self.parse_unary_expression(next)?;
+        let op = self.peek()?;
+        if !op.r#type.is_binary_op() {
+            return Ok(left);
+        }
+        self.parse_binary_expression(left)
+    }
+
+    fn parse_unary_expression(&mut self, left: Token) -> Result<HirExpression> {
+        if left.r#type.is_unary_op() {
+            self.expect_one()?;
+            let next = self.peek()?;
+            return Ok(apply_unary(left, self.parse_unary_expression(next)?));
+        }
+        match left.r#type {
+            TokenType::LeftParen => {
+                self.expect_one()?;
+                let expr = self.parse_expression();
+                self.expect(TokenType::RightParen)?;
+                expr
+            }
+            TokenType::Integer => {
+                self.expect_one()?;
+                Ok(HirExpression::Int { slice: left.slice })
+            }
+            TokenType::Float => {
+                self.expect_one()?;
+                Ok(HirExpression::Float { slice: left.slice })
+            }
+            TokenType::String => {
+                self.expect_one()?;
+                Ok(HirExpression::String { slice: left.slice })
+            }
+            TokenType::Identifier => {
+                self.expect_one()?;
+                Ok(HirExpression::Access { name: left.slice })
+                // todo: calls
+            }
+            _ => Err(Error::InvalidUnaryExpression),
+        }
+    }
+
+    fn parse_binary_expression(&mut self, left: HirExpression) -> Result<HirExpression> {
+        let op = self.expect_one()?;
+        let next = self.peek()?;
+        let right = self.parse_unary_expression(next)?;
+        let next = self.peek()?;
+        if !next.r#type.is_binary_op() {
+            return Ok(apply_binary(op, left, right));
+        }
+        if op.r#type.precedence() < next.r#type.precedence() {
+            return Ok(apply_binary(op, left, self.parse_binary_expression(right)?));
+        }
+        self.parse_binary_expression(apply_binary(op, left, right))
+    }
+}
+
+fn apply_unary(op: Token, arg: HirExpression) -> HirExpression {
+    HirExpression::UnaryOp {
+        op,
+        arg: Box::new(arg),
+    }
+}
+
+fn apply_binary(op: Token, lhs: HirExpression, rhs: HirExpression) -> HirExpression {
+    HirExpression::BinaryOp {
+        op,
+        args: Box::new([lhs, rhs]),
     }
 }

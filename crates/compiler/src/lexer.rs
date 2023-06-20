@@ -14,6 +14,9 @@ pub const KEYWORDS: Map<&str, TokenType> = phf_map! {
     "fun" => TokenType::KwFun,
     "const" => TokenType::KwConst,
     "var" => TokenType::KwVar,
+    "if" => TokenType::KwIf,
+    "else" => TokenType::KwElse,
+    "elseif" => TokenType::KwElseif,
     "for" => TokenType::KwFor,
     "while" => TokenType::KwWhile,
     "in" => TokenType::KwIn,
@@ -99,6 +102,9 @@ pub enum TokenType {
     KwFun,
     KwConst,
     KwVar,
+    KwIf,
+    KwElse,
+    KwElseif,
     KwFor,
     KwWhile,
     KwIn,
@@ -107,6 +113,71 @@ pub enum TokenType {
     KwBreak,
     KwAnd,
     KwOr,
+}
+
+impl TokenType {
+    pub fn is_unary_op(&self) -> bool {
+        matches!(
+            self,
+            Self::Bang
+                | Self::And
+                // | Self::Pipe
+                // | Self::Caret
+                | Self::Plus
+                | Self::Minus
+                | Self::Star
+        )
+        /*
+        | Self::Slash
+        | Self::Percent
+        | Self::Equal
+        | Self::Less
+        | Self::Greater
+        | Self::LessLess
+        | Self::GreaterGreater
+         */
+    }
+
+    pub fn is_binary_op(&self) -> bool {
+        matches!(
+            self,
+            Self::Bang
+                | Self::And
+                | Self::Pipe
+                | Self::Caret
+                | Self::Plus
+                | Self::Minus
+                | Self::Star
+                | Self::Slash
+                | Self::Percent
+                | Self::Less
+                | Self::Greater
+                | Self::BangEqual
+                | Self::EqualEqual
+                | Self::LessEqual
+                | Self::GreaterEqual
+                | Self::LessLess
+                | Self::GreaterGreater
+                | Self::KwAnd
+                | Self::KwOr
+        )
+    }
+
+    pub fn precedence(&self) -> usize {
+        match self {
+            Self::KwOr => 1,
+            Self::KwAnd => 2,
+            Self::Pipe => 3,
+            Self::Caret => 4,
+            Self::And => 5,
+            Self::EqualEqual | Self::BangEqual => 6,
+            Self::Less | Self::Greater | Self::LessEqual | Self::GreaterEqual => 7,
+            Self::LessLess | Self::GreaterGreater => 8,
+            Self::Plus | Self::Minus => 9,
+            Self::Star | Self::Slash | Self::Percent => 10,
+            _ => panic!("Invalid operator"),
+        }
+    }
 }
 
 pub struct Lexer {
