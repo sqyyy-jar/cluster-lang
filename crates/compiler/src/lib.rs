@@ -21,7 +21,10 @@ module test;
 import a:{b, c.d};
 
 fun main() {
-    a = 2;
+    a.a.a = 2;
+    a();
+    a.b();
+    a().b();
 }
         "#,
         ));

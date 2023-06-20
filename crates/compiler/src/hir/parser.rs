@@ -299,9 +299,9 @@ impl Parser {
         match left.r#type {
             TokenType::LeftParen => {
                 self.expect_one()?;
-                let expr = self.parse_expression();
+                let expr = self.parse_expression()?;
                 self.expect(TokenType::RightParen)?;
-                expr
+                Ok(expr)
             }
             TokenType::Integer => {
                 self.expect_one()?;
@@ -317,8 +317,17 @@ impl Parser {
             }
             TokenType::Identifier => {
                 self.expect_one()?;
-                Ok(HirExpression::Access { name: left.slice })
-                // todo: calls
+                let mut left = HirExpression::Access { name: left.slice };
+                if self.peek()?.r#type == TokenType::LeftParen {
+                    left = HirExpression::Call {
+                        expr: Box::new(left),
+                        args: self.parse_call_args()?,
+                    };
+                }
+                if self.peek()?.r#type == TokenType::Dot {
+                    return self.parse_dot_expression(left);
+                }
+                Ok(left)
             }
             _ => Err(Error::InvalidUnaryExpression),
         }
@@ -336,6 +345,45 @@ impl Parser {
             return Ok(apply_binary(op, left, self.parse_binary_expression(right)?));
         }
         self.parse_binary_expression(apply_binary(op, left, right))
+    }
+
+    fn parse_dot_expression(&mut self, left: HirExpression) -> Result<HirExpression> {
+        self.expect(TokenType::Dot)?;
+        let name = self.expect(TokenType::Identifier)?.slice;
+        let right = if self.peek()?.r#type == TokenType::LeftParen {
+            HirExpression::Call {
+                expr: Box::new(HirExpression::DotAccess {
+                    expr: Box::new(left),
+                    name,
+                }),
+                args: self.parse_call_args()?,
+            }
+        } else {
+            HirExpression::DotAccess {
+                expr: Box::new(left),
+                name,
+            }
+        };
+        if self.peek()?.r#type == TokenType::Dot {
+            return self.parse_dot_expression(right);
+        }
+        Ok(right)
+    }
+
+    fn parse_call_args(&mut self) -> Result<Vec<HirExpression>> {
+        self.expect(TokenType::LeftParen)?;
+        let mut expressions = Vec::with_capacity(0);
+        loop {
+            if self.peek()?.r#type == TokenType::RightParen {
+                break;
+            }
+            expressions.push(self.parse_expression()?);
+            if self.maybe(TokenType::Comma)?.is_none() {
+                break;
+            }
+        }
+        self.expect(TokenType::RightParen)?;
+        Ok(expressions)
     }
 }
 
