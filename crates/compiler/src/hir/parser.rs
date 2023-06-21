@@ -301,7 +301,7 @@ impl Parser {
                 self.expect_one()?;
                 let expr = self.parse_expression()?;
                 self.expect(TokenType::RightParen)?;
-                Ok(expr)
+                self.parse_dot_expression(expr)
             }
             TokenType::Integer => {
                 self.expect_one()?;
@@ -313,7 +313,7 @@ impl Parser {
             }
             TokenType::String => {
                 self.expect_one()?;
-                Ok(HirExpression::String { slice: left.slice })
+                self.parse_dot_expression(HirExpression::String { slice: left.slice })
             }
             TokenType::Identifier => {
                 self.expect_one()?;
@@ -324,10 +324,7 @@ impl Parser {
                         args: self.parse_call_args()?,
                     };
                 }
-                if self.peek()?.r#type == TokenType::Dot {
-                    return self.parse_dot_expression(left);
-                }
-                Ok(left)
+                self.parse_dot_expression(left)
             }
             _ => Err(Error::InvalidUnaryExpression),
         }
@@ -348,7 +345,9 @@ impl Parser {
     }
 
     fn parse_dot_expression(&mut self, left: HirExpression) -> Result<HirExpression> {
-        self.expect(TokenType::Dot)?;
+        if self.maybe(TokenType::Dot)?.is_none() {
+            return Ok(left);
+        }
         let name = self.expect(TokenType::Identifier)?.slice;
         let right = if self.peek()?.r#type == TokenType::LeftParen {
             HirExpression::Call {
