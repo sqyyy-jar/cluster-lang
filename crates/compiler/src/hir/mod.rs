@@ -45,15 +45,18 @@ pub struct HirImport {
 pub enum HirTypeDecl {
     Trait {
         name: Str,
+        public: bool,
         functions: Vec<HirFunction>,
     },
     Struct {
         name: Str,
+        public: bool,
         fields: Vec<HirStructField>,
         functions: Vec<HirFunction>,
     },
     Enum {
         name: Str,
+        public: bool,
         variants: Vec<HirEnumVariant>,
         functions: Vec<HirFunction>,
     },

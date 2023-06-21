@@ -234,11 +234,11 @@ impl Parser {
                 self.expect_one()?;
                 let cond = self.parse_expression()?;
                 let block = self.parse_block()?;
-                // todo: add else and elseif
+                let else_block = self.parse_else()?;
                 Ok(HirStatement::If {
                     cond,
                     block,
-                    else_block: None,
+                    else_block,
                 })
             }
             TokenType::KwWhile => {
@@ -409,6 +409,29 @@ impl Parser {
         }
         self.expect(TokenType::RightParen)?;
         Ok(expressions)
+    }
+
+    fn parse_else(&mut self) -> Result<Option<HirBlock>> {
+        match self.peek()?.r#type {
+            TokenType::KwElseif => {
+                self.expect_one()?;
+                let cond = self.parse_expression()?;
+                let block = self.parse_block()?;
+                let else_block = self.parse_else()?;
+                Ok(Some(HirBlock {
+                    statements: vec![HirStatement::If {
+                        cond,
+                        block,
+                        else_block,
+                    }],
+                }))
+            }
+            TokenType::KwElse => {
+                self.expect_one()?;
+                self.parse_block().map(Some)
+            }
+            _ => Ok(None),
+        }
     }
 }
 
