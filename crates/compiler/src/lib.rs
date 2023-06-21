@@ -33,6 +33,5 @@ fun main() {
         ));
         parser.parse().expect("Parse");
         println!("{:#?}", parser.ast);
-        panic!();
     }
 }
