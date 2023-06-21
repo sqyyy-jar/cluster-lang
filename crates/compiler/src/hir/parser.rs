@@ -1,4 +1,4 @@
-use std::{any::Any, rc::Rc};
+use std::rc::Rc;
 
 use crate::{
     hir::HirFunction,
@@ -146,10 +146,8 @@ impl Parser {
 
     fn parse_function(&mut self, public: bool) -> Result<()> {
         let name = self.expect(TokenType::Identifier)?.slice;
-        // generics
-        self.expect(TokenType::LeftParen)?;
+        // todo: generics
         let params = self.parse_function_params()?;
-        self.expect(TokenType::RightParen)?;
         let return_type = if self.maybe(TokenType::Arrow)?.is_some() {
             Some(self.parse_type()?)
         } else {
@@ -172,6 +170,7 @@ impl Parser {
 
     fn parse_function_params(&mut self) -> Result<Vec<HirFunctionParam>> {
         let mut params = Vec::with_capacity(0);
+        self.expect(TokenType::LeftParen)?;
         loop {
             if self.peek()?.r#type == TokenType::RightParen {
                 break;
@@ -183,6 +182,7 @@ impl Parser {
                 break;
             }
         }
+        self.expect(TokenType::RightParen)?;
         Ok(params)
     }
 
@@ -269,6 +269,12 @@ impl Parser {
                         Ok(HirStatement::Assign { expr, value })
                     }
                     HirExpression::DotAccess { .. } => {
+                        self.expect(TokenType::Equal)?;
+                        let value = self.parse_expression()?;
+                        self.expect(TokenType::Semicolon)?;
+                        Ok(HirStatement::Assign { expr, value })
+                    }
+                    HirExpression::IndexAccess { .. } => {
                         self.expect(TokenType::Equal)?;
                         let value = self.parse_expression()?;
                         self.expect(TokenType::Semicolon)?;
