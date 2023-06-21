@@ -154,6 +154,11 @@ pub enum HirExpression {
         expr: Box<HirExpression>,
         name: Str,
     },
+    /// `expr[index]`
+    IndexAccess {
+        expr: Box<HirExpression>,
+        index: Box<HirExpression>,
+    },
     /// `expr(args)`
     Call {
         expr: Box<HirExpression>,

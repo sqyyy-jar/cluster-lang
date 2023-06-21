@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{any::Any, rc::Rc};
 
 use crate::{
     hir::HirFunction,
@@ -301,7 +301,7 @@ impl Parser {
                 self.expect_one()?;
                 let expr = self.parse_expression()?;
                 self.expect(TokenType::RightParen)?;
-                self.parse_dot_expression(expr)
+                self.parse_access_expression(expr)
             }
             TokenType::Integer => {
                 self.expect_one()?;
@@ -313,7 +313,7 @@ impl Parser {
             }
             TokenType::String => {
                 self.expect_one()?;
-                self.parse_dot_expression(HirExpression::String { slice: left.slice })
+                self.parse_access_expression(HirExpression::String { slice: left.slice })
             }
             TokenType::Identifier => {
                 self.expect_one()?;
@@ -324,7 +324,7 @@ impl Parser {
                         args: self.parse_call_args()?,
                     };
                 }
-                self.parse_dot_expression(left)
+                self.parse_access_expression(left)
             }
             _ => Err(Error::InvalidUnaryExpression),
         }
@@ -344,29 +344,49 @@ impl Parser {
         self.parse_binary_expression(apply_binary(op, left, right))
     }
 
-    fn parse_dot_expression(&mut self, left: HirExpression) -> Result<HirExpression> {
-        if self.maybe(TokenType::Dot)?.is_none() {
-            return Ok(left);
-        }
-        let name = self.expect(TokenType::Identifier)?.slice;
-        let right = if self.peek()?.r#type == TokenType::LeftParen {
-            HirExpression::Call {
-                expr: Box::new(HirExpression::DotAccess {
-                    expr: Box::new(left),
-                    name,
-                }),
-                args: self.parse_call_args()?,
+    fn parse_access_expression(&mut self, left: HirExpression) -> Result<HirExpression> {
+        match self.peek()?.r#type {
+            TokenType::Dot => {
+                self.expect_one()?;
+                let name = self.expect(TokenType::Identifier)?.slice;
+                let right = if self.peek()?.r#type == TokenType::LeftParen {
+                    HirExpression::Call {
+                        expr: Box::new(HirExpression::DotAccess {
+                            expr: Box::new(left),
+                            name,
+                        }),
+                        args: self.parse_call_args()?,
+                    }
+                } else {
+                    HirExpression::DotAccess {
+                        expr: Box::new(left),
+                        name,
+                    }
+                };
+                self.parse_access_expression(right)
             }
-        } else {
-            HirExpression::DotAccess {
-                expr: Box::new(left),
-                name,
+            TokenType::LeftBracket => {
+                self.expect_one()?;
+                let index = self.parse_expression()?;
+                self.expect(TokenType::RightBracket)?;
+                let right = if self.peek()?.r#type == TokenType::LeftParen {
+                    HirExpression::Call {
+                        expr: Box::new(HirExpression::IndexAccess {
+                            expr: Box::new(left),
+                            index: Box::new(index),
+                        }),
+                        args: self.parse_call_args()?,
+                    }
+                } else {
+                    HirExpression::IndexAccess {
+                        expr: Box::new(left),
+                        index: Box::new(index),
+                    }
+                };
+                self.parse_access_expression(right)
             }
-        };
-        if self.peek()?.r#type == TokenType::Dot {
-            return self.parse_dot_expression(right);
+            _ => Ok(left),
         }
-        Ok(right)
     }
 
     fn parse_call_args(&mut self) -> Result<Vec<HirExpression>> {
