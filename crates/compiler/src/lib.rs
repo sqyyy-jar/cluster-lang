@@ -1,5 +1,3 @@
-#![feature(result_flattening)]
-
 pub mod error;
 pub mod hir;
 pub mod lexer;
