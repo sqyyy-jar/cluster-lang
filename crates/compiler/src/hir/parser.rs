@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::{
-    hir::HirFunction,
+    hir::{HirConst, HirFunction},
     lexer::{Lexer, Token, TokenType},
     prelude::*,
 };
@@ -87,10 +87,12 @@ impl Parser {
                 TokenType::KwPub => {
                     let next = self.expect_one()?;
                     match next.r#type {
+                        TokenType::KwConst => self.parse_const(true)?,
                         TokenType::KwFun => self.parse_function(true)?,
                         _ => return Err(Error::UnexpectedToken),
                     }
                 }
+                TokenType::KwConst => self.parse_const(false)?,
                 TokenType::KwFun => self.parse_function(false)?,
                 _ => {
                     eprintln!(
@@ -102,11 +104,6 @@ impl Parser {
             }
         }
         Ok(())
-    }
-
-    fn parse_type(&mut self) -> Result<HirType> {
-        let name = self.expect(TokenType::Identifier)?;
-        Ok(HirType { name: name.slice })
     }
 
     fn parse_import(&mut self, buf: &mut Vec<Str>) -> Result<()> {
@@ -127,20 +124,6 @@ impl Parser {
             }),
         }
         buf.pop().unwrap();
-        Ok(())
-    }
-
-    fn parse_import_group(&mut self, buf: &mut Vec<Str>) -> Result<()> {
-        self.expect(TokenType::LeftBrace)?;
-        loop {
-            self.parse_import(buf)?;
-            let next = self.expect_one()?;
-            match next.r#type {
-                TokenType::RightBrace => break,
-                TokenType::Comma => {}
-                _ => return Err(Error::UnexpectedToken),
-            }
-        }
         Ok(())
     }
 
@@ -165,6 +148,31 @@ impl Parser {
             return_type,
             body,
         });
+        Ok(())
+    }
+
+    fn parse_const(&mut self, public: bool) -> Result<()> {
+        let (name, r#type, expr) = self.parse_var_decl()?;
+        self.ast.constants.push(HirConst { name, r#type, expr });
+        Ok(())
+    }
+
+    fn parse_type(&mut self) -> Result<HirType> {
+        let name = self.expect(TokenType::Identifier)?;
+        Ok(HirType { name: name.slice })
+    }
+
+    fn parse_import_group(&mut self, buf: &mut Vec<Str>) -> Result<()> {
+        self.expect(TokenType::LeftBrace)?;
+        loop {
+            self.parse_import(buf)?;
+            let next = self.expect_one()?;
+            match next.r#type {
+                TokenType::RightBrace => break,
+                TokenType::Comma => {}
+                _ => return Err(Error::UnexpectedToken),
+            }
+        }
         Ok(())
     }
 
@@ -200,34 +208,12 @@ impl Parser {
         match tok.r#type {
             TokenType::KwVar => {
                 self.expect_one()?;
-                let name = self.expect(TokenType::Identifier)?.slice;
-                let r#type = if self.maybe(TokenType::Colon)?.is_some() {
-                    Some(self.parse_type()?)
-                } else {
-                    None
-                };
-                let expr = if self.maybe(TokenType::Equal)?.is_some() {
-                    Some(self.parse_expression()?)
-                } else {
-                    None
-                };
-                self.expect(TokenType::Semicolon)?;
+                let (name, r#type, expr) = self.parse_var_decl()?;
                 Ok(HirStatement::VarDecl { name, r#type, expr })
             }
             TokenType::KwConst => {
                 self.expect_one()?;
-                let name = self.expect(TokenType::Identifier)?.slice;
-                let r#type = if self.maybe(TokenType::Colon)?.is_some() {
-                    Some(self.parse_type()?)
-                } else {
-                    None
-                };
-                let expr = if self.maybe(TokenType::Equal)?.is_some() {
-                    Some(self.parse_expression()?)
-                } else {
-                    None
-                };
-                self.expect(TokenType::Semicolon)?;
+                let (name, r#type, expr) = self.parse_var_decl()?;
                 Ok(HirStatement::ConstDecl { name, r#type, expr })
             }
             TokenType::KwIf => {
@@ -284,6 +270,22 @@ impl Parser {
                 }
             }
         }
+    }
+
+    fn parse_var_decl(&mut self) -> Result<(Str, Option<HirType>, Option<HirExpression>)> {
+        let name = self.expect(TokenType::Identifier)?.slice;
+        let r#type = if self.maybe(TokenType::Colon)?.is_some() {
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+        let expr = if self.maybe(TokenType::Equal)?.is_some() {
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+        self.expect(TokenType::Semicolon)?;
+        Ok((name, r#type, expr))
     }
 
     fn parse_expression(&mut self) -> Result<HirExpression> {

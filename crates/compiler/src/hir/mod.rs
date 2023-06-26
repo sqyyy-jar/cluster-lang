@@ -6,6 +6,7 @@ use crate::{lexer::Token, prelude::*};
 pub struct Hir {
     pub modules: Vec<HirModule>,
     pub imports: Vec<HirImport>,
+    pub constants: Vec<HirConst>,
     pub types: Vec<HirTypeDecl>,
     pub functions: Vec<HirFunction>,
 }
@@ -15,6 +16,7 @@ impl Default for Hir {
         Self {
             modules: Vec::with_capacity(0),
             imports: Vec::with_capacity(0),
+            constants: Vec::with_capacity(0),
             types: Vec::with_capacity(0),
             functions: Vec::with_capacity(0),
         }
@@ -39,6 +41,13 @@ pub struct HirModule {
 #[derive(Debug)]
 pub struct HirImport {
     pub path: HirPath,
+}
+
+#[derive(Debug)]
+pub struct HirConst {
+    pub name: Str,
+    pub r#type: Option<HirType>,
+    pub expr: Option<HirExpression>,
 }
 
 #[derive(Debug)]
