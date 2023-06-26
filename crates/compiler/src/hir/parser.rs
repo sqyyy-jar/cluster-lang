@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::hir::{HirStructField, HirTypeDecl};
 use crate::{
     hir::{HirConst, HirFunction},
     lexer::{Lexer, Token, TokenType},
@@ -81,19 +82,23 @@ impl Parser {
                 }
                 TokenType::KwImport => {
                     let mut buf = Vec::new();
-                    self.parse_import(&mut buf)?;
+                    self.parse_root_import(&mut buf)?;
                     self.expect(TokenType::Semicolon)?;
                 }
                 TokenType::KwPub => {
                     let next = self.expect_one()?;
                     match next.r#type {
-                        TokenType::KwConst => self.parse_const(true)?,
-                        TokenType::KwFun => self.parse_function(true)?,
+                        TokenType::KwConst => self.parse_root_const(true)?,
+                        TokenType::KwTrait => self.parse_root_trait(true)?,
+                        TokenType::KwStruct => self.parse_root_struct(true)?,
+                        TokenType::KwFun => self.parse_root_function(true)?,
                         _ => return Err(Error::UnexpectedToken),
                     }
                 }
-                TokenType::KwConst => self.parse_const(false)?,
-                TokenType::KwFun => self.parse_function(false)?,
+                TokenType::KwConst => self.parse_root_const(false)?,
+                TokenType::KwTrait => self.parse_root_trait(false)?,
+                TokenType::KwStruct => self.parse_root_struct(false)?,
+                TokenType::KwFun => self.parse_root_function(false)?,
                 _ => {
                     eprintln!(
                         "UNHANDLED TOKEN: {:?} {:?}",
@@ -106,14 +111,14 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_import(&mut self, buf: &mut Vec<Str>) -> Result<()> {
+    fn parse_root_import(&mut self, buf: &mut Vec<Str>) -> Result<()> {
         let root = self.expect(TokenType::Identifier)?;
         buf.push(root.slice);
         let next = self.peek()?;
         match next.r#type {
             TokenType::Dot => {
                 self.expect_one()?;
-                self.parse_import(buf)?;
+                self.parse_root_import(buf)?;
             }
             TokenType::Colon => {
                 self.expect_one()?;
@@ -127,7 +132,80 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_function(&mut self, public: bool) -> Result<()> {
+    fn parse_root_const(&mut self, public: bool) -> Result<()> {
+        let (name, r#type, expr) = self.parse_var_decl()?;
+        self.ast.constants.push(HirConst {
+            name,
+            public,
+            r#type,
+            expr,
+        });
+        Ok(())
+    }
+
+    fn parse_root_trait(&mut self, public: bool) -> Result<()> {
+        let name = self.expect(TokenType::Identifier)?.slice;
+        // todo: generics
+        let mut functions = Vec::with_capacity(0);
+        while self.maybe(TokenType::RightBrace)?.is_none() {
+            functions.push(self.parse_function(false)?);
+        }
+        self.ast.types.push(HirTypeDecl::Trait {
+            name,
+            public,
+            functions,
+        });
+        Ok(())
+    }
+
+    fn parse_root_struct(&mut self, public: bool) -> Result<()> {
+        let name = self.expect(TokenType::Identifier)?.slice;
+        // todo: generics
+        let mut fields = Vec::with_capacity(0);
+        let mut functions = Vec::with_capacity(0);
+        while self.maybe(TokenType::RightBrace)?.is_none() {
+            if self.maybe(TokenType::KwPub)?.is_some() {
+                if self.maybe(TokenType::KwFun)?.is_some() {
+                    self.expect_one()?;
+                    functions.push(self.parse_function(true)?);
+                    continue;
+                }
+                fields.push(self.parse_struct_field(true)?);
+                continue;
+            }
+            if self.maybe(TokenType::KwFun)?.is_some() {
+                self.expect_one()?;
+                functions.push(self.parse_function(false)?);
+                continue;
+            }
+            fields.push(self.parse_struct_field(false)?);
+        }
+        self.ast.types.push(HirTypeDecl::Struct {
+            name,
+            public,
+            fields,
+            functions,
+        });
+        Ok(())
+    }
+
+    fn parse_root_function(&mut self, public: bool) -> Result<()> {
+        let function = self.parse_function(public)?;
+        self.ast.functions.push(function);
+        Ok(())
+    }
+
+    fn parse_struct_field(&mut self, public: bool) -> Result<HirStructField> {
+        let r#type = self.parse_type()?;
+        let name = self.expect(TokenType::Identifier)?.slice;
+        Ok(HirStructField {
+            name,
+            public,
+            r#type,
+        })
+    }
+
+    fn parse_function(&mut self, public: bool) -> Result<HirFunction> {
         let name = self.expect(TokenType::Identifier)?.slice;
         // todo: generics
         let params = self.parse_function_params()?;
@@ -141,20 +219,13 @@ impl Parser {
         } else {
             Some(self.parse_block()?)
         };
-        self.ast.functions.push(HirFunction {
+        Ok(HirFunction {
             name,
             public,
             params,
             return_type,
             body,
-        });
-        Ok(())
-    }
-
-    fn parse_const(&mut self, public: bool) -> Result<()> {
-        let (name, r#type, expr) = self.parse_var_decl()?;
-        self.ast.constants.push(HirConst { name, r#type, expr });
-        Ok(())
+        })
     }
 
     fn parse_type(&mut self) -> Result<HirType> {
@@ -165,7 +236,7 @@ impl Parser {
     fn parse_import_group(&mut self, buf: &mut Vec<Str>) -> Result<()> {
         self.expect(TokenType::LeftBrace)?;
         loop {
-            self.parse_import(buf)?;
+            self.parse_root_import(buf)?;
             let next = self.expect_one()?;
             match next.r#type {
                 TokenType::RightBrace => break,
@@ -240,6 +311,22 @@ impl Parser {
                 let expr = self.parse_expression()?;
                 let block = self.parse_block()?;
                 Ok(HirStatement::For { name, expr, block })
+            }
+            TokenType::KwReturn => {
+                self.expect_one()?;
+                let expr = self.parse_expression()?;
+                self.expect(TokenType::Semicolon)?;
+                Ok(HirStatement::Return { expr })
+            }
+            TokenType::KwContinue => {
+                self.expect_one()?;
+                self.expect(TokenType::Semicolon)?;
+                Ok(HirStatement::Continue)
+            }
+            TokenType::KwBreak => {
+                self.expect_one()?;
+                self.expect(TokenType::Semicolon)?;
+                Ok(HirStatement::Break)
             }
             _ => {
                 let expr = self.parse_expression()?;
@@ -329,7 +416,7 @@ impl Parser {
                 if self.peek()?.r#type == TokenType::LeftParen {
                     left = HirExpression::Call {
                         expr: Box::new(left),
-                        args: self.parse_call_args()?,
+                        args: self.parse_function_call_args()?,
                     };
                 }
                 self.parse_access_expression(left)
@@ -363,7 +450,7 @@ impl Parser {
                             expr: Box::new(left),
                             name,
                         }),
-                        args: self.parse_call_args()?,
+                        args: self.parse_function_call_args()?,
                     }
                 } else {
                     HirExpression::DotAccess {
@@ -383,7 +470,7 @@ impl Parser {
                             expr: Box::new(left),
                             index: Box::new(index),
                         }),
-                        args: self.parse_call_args()?,
+                        args: self.parse_function_call_args()?,
                     }
                 } else {
                     HirExpression::IndexAccess {
@@ -397,7 +484,7 @@ impl Parser {
         }
     }
 
-    fn parse_call_args(&mut self) -> Result<Vec<HirExpression>> {
+    fn parse_function_call_args(&mut self) -> Result<Vec<HirExpression>> {
         self.expect(TokenType::LeftParen)?;
         let mut expressions = Vec::with_capacity(0);
         loop {

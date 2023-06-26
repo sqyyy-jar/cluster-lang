@@ -1,6 +1,6 @@
-pub mod parser;
-
 use crate::{lexer::Token, prelude::*};
+
+pub mod parser;
 
 #[derive(Debug)]
 pub struct Hir {
@@ -23,6 +23,7 @@ impl Default for Hir {
     }
 }
 
+// todo: generics
 #[derive(Debug)]
 pub struct HirType {
     pub name: Str,
@@ -46,6 +47,7 @@ pub struct HirImport {
 #[derive(Debug)]
 pub struct HirConst {
     pub name: Str,
+    pub public: bool,
     pub r#type: Option<HirType>,
     pub expr: Option<HirExpression>,
 }
@@ -89,7 +91,8 @@ pub struct HirFunctionParam {
 #[derive(Debug)]
 pub struct HirStructField {
     pub name: Str,
-    pub r#type: Str,
+    pub public: bool,
+    pub r#type: HirType,
 }
 
 #[derive(Debug)]
@@ -144,6 +147,12 @@ pub enum HirStatement {
         expr: HirExpression,
         args: Vec<HirExpression>,
     },
+    /// `return expr;`
+    Return { expr: HirExpression },
+    /// `continue;`
+    Continue,
+    /// `break;`
+    Break,
 }
 
 #[derive(Debug)]
