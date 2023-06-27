@@ -36,7 +36,7 @@ impl Parser {
             self.lex.next_token()?.ok_or(Error::UnexpectedEof)?
         };
         if tok.r#type != token_type {
-            return Err(Error::UnexpectedToken);
+            return Err(Error::UnexpectedToken(tok.slice));
         }
         Ok(tok)
     }
@@ -75,14 +75,17 @@ impl Parser {
     pub fn parse(&mut self) -> Result<()> {
         while let Some(tok) = self.lex.next_token()? {
             match tok.r#type {
-                TokenType::KwPub => match self.expect_one()?.r#type {
-                    TokenType::KwModule => self.parse_root_module(true)?,
-                    TokenType::KwConst => self.parse_root_const(true)?,
-                    TokenType::KwTrait => self.parse_root_trait(true)?,
-                    TokenType::KwStruct => self.parse_root_struct(true)?,
-                    TokenType::KwFun => self.parse_root_function(true)?,
-                    _ => return Err(Error::UnexpectedToken),
-                },
+                TokenType::KwPub => {
+                    let next = self.expect_one()?;
+                    match next.r#type {
+                        TokenType::KwModule => self.parse_root_module(true)?,
+                        TokenType::KwConst => self.parse_root_const(true)?,
+                        TokenType::KwTrait => self.parse_root_trait(true)?,
+                        TokenType::KwStruct => self.parse_root_struct(true)?,
+                        TokenType::KwFun => self.parse_root_function(true)?,
+                        _ => return Err(Error::UnexpectedToken(next.slice)),
+                    }
+                }
                 TokenType::KwModule => self.parse_root_module(false)?,
                 TokenType::KwImport => {
                     self.parse_root_import(&mut Vec::new())?;
@@ -254,6 +257,7 @@ impl Parser {
 
     fn parse_type(&mut self) -> Result<HirType> {
         let name = self.expect(TokenType::Identifier)?;
+        // todo: generics
         Ok(HirType { name: name.slice })
     }
 
@@ -265,7 +269,7 @@ impl Parser {
             match next.r#type {
                 TokenType::RightBrace => break,
                 TokenType::Comma => {}
-                _ => return Err(Error::UnexpectedToken),
+                _ => return Err(Error::UnexpectedToken(next.slice)),
             }
         }
         Ok(())

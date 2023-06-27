@@ -371,11 +371,11 @@ impl Lexer {
                     }
                     while let Some(bc) = self.peek() {
                         if bc == '.' {
+                            self.eat();
                             if is_float {
-                                return Err(Error::InvalidFloat);
+                                return Err(Error::InvalidFloat(Str(index, self.index)));
                             }
                             is_float = true;
-                            self.eat();
                             continue;
                         }
                         if !bc.is_ascii_digit() {
@@ -397,6 +397,7 @@ impl Lexer {
                         }
                         let ac = ac.unwrap();
                         if ac == '\\' {
+                            let escape_sequence_start = self.index;
                             self.eat();
                             let Some(bc) = self.peek() else {
                                 return Err(Error::UnexpectedEof);
@@ -409,18 +410,29 @@ impl Lexer {
                                         return Err(Error::UnexpectedEof);
                                     };
                                     if !matches!(cc, '0'..='9' | 'a'..='f' | 'A'..='F') {
-                                        return Err(Error::InvalidEscapeSequence);
+                                        return Err(Error::InvalidEscapeSequence(Str(
+                                            escape_sequence_start,
+                                            self.index,
+                                        )));
                                     }
                                     self.eat();
                                     let Some(dc) = self.peek() else {
                                         return Err(Error::UnexpectedEof);
                                     };
                                     if !matches!(dc, '0'..='9' | 'a'..='f' | 'A'..='F') {
-                                        return Err(Error::InvalidEscapeSequence);
+                                        return Err(Error::InvalidEscapeSequence(Str(
+                                            escape_sequence_start,
+                                            self.index,
+                                        )));
                                     }
                                     self.eat();
                                 }
-                                _ => return Err(Error::InvalidEscapeSequence),
+                                _ => {
+                                    return Err(Error::InvalidEscapeSequence(Str(
+                                        escape_sequence_start,
+                                        self.index,
+                                    )))
+                                }
                             }
                             continue;
                         }
