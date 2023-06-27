@@ -8,6 +8,7 @@ pub struct Hir {
     pub imports: Vec<HirImport>,
     pub constants: Vec<HirConst>,
     pub types: Vec<HirTypeDecl>,
+    pub impls: Vec<HirImpl>,
     pub functions: Vec<HirFunction>,
 }
 
@@ -18,6 +19,7 @@ impl Default for Hir {
             imports: Vec::with_capacity(0),
             constants: Vec::with_capacity(0),
             types: Vec::with_capacity(0),
+            impls: Vec::with_capacity(0),
             functions: Vec::with_capacity(0),
         }
     }
@@ -37,6 +39,7 @@ pub struct HirPath {
 #[derive(Debug)]
 pub struct HirModule {
     pub name: Str,
+    pub public: bool,
 }
 
 #[derive(Debug)]
@@ -52,6 +55,7 @@ pub struct HirConst {
     pub expr: Option<HirExpression>,
 }
 
+// todo: generics
 #[derive(Debug)]
 pub enum HirTypeDecl {
     Trait {
@@ -73,6 +77,15 @@ pub enum HirTypeDecl {
     },
 }
 
+// todo: generics
+#[derive(Debug)]
+pub struct HirImpl {
+    pub target: HirType,
+    pub r#trait: HirType,
+    pub functions: Vec<HirFunction>,
+}
+
+// todo: generics
 #[derive(Debug)]
 pub struct HirFunction {
     pub name: Str,
@@ -142,6 +155,7 @@ pub enum HirStatement {
         expr: HirExpression,
         block: HirBlock,
     },
+    // todo: generics
     /// `expr(args);`
     Call {
         expr: HirExpression,
@@ -180,6 +194,7 @@ pub enum HirExpression {
         expr: Box<HirExpression>,
         index: Box<HirExpression>,
     },
+    // todo: generics
     /// `expr(args)`
     Call {
         expr: Box<HirExpression>,

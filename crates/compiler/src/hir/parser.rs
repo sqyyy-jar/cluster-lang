@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::hir::{HirStructField, HirTypeDecl};
+use crate::hir::{HirImpl, HirStructField, HirTypeDecl};
 use crate::{
     hir::{HirConst, HirFunction},
     lexer::{Lexer, Token, TokenType},
@@ -75,29 +75,23 @@ impl Parser {
     pub fn parse(&mut self) -> Result<()> {
         while let Some(tok) = self.lex.next_token()? {
             match tok.r#type {
-                TokenType::KwModule => {
-                    let ident = self.expect(TokenType::Identifier)?;
-                    self.expect(TokenType::Semicolon)?;
-                    self.ast.modules.push(HirModule { name: ident.slice });
-                }
+                TokenType::KwPub => match self.expect_one()?.r#type {
+                    TokenType::KwModule => self.parse_root_module(true)?,
+                    TokenType::KwConst => self.parse_root_const(true)?,
+                    TokenType::KwTrait => self.parse_root_trait(true)?,
+                    TokenType::KwStruct => self.parse_root_struct(true)?,
+                    TokenType::KwFun => self.parse_root_function(true)?,
+                    _ => return Err(Error::UnexpectedToken),
+                },
+                TokenType::KwModule => self.parse_root_module(false)?,
                 TokenType::KwImport => {
-                    let mut buf = Vec::new();
-                    self.parse_root_import(&mut buf)?;
+                    self.parse_root_import(&mut Vec::new())?;
                     self.expect(TokenType::Semicolon)?;
-                }
-                TokenType::KwPub => {
-                    let next = self.expect_one()?;
-                    match next.r#type {
-                        TokenType::KwConst => self.parse_root_const(true)?,
-                        TokenType::KwTrait => self.parse_root_trait(true)?,
-                        TokenType::KwStruct => self.parse_root_struct(true)?,
-                        TokenType::KwFun => self.parse_root_function(true)?,
-                        _ => return Err(Error::UnexpectedToken),
-                    }
                 }
                 TokenType::KwConst => self.parse_root_const(false)?,
                 TokenType::KwTrait => self.parse_root_trait(false)?,
                 TokenType::KwStruct => self.parse_root_struct(false)?,
+                TokenType::KwImpl => self.parse_root_impl()?,
                 TokenType::KwFun => self.parse_root_function(false)?,
                 _ => {
                     eprintln!(
@@ -108,6 +102,13 @@ impl Parser {
                 }
             }
         }
+        Ok(())
+    }
+
+    fn parse_root_module(&mut self, public: bool) -> Result<()> {
+        let name = self.expect(TokenType::Identifier)?.slice;
+        self.expect(TokenType::Semicolon)?;
+        self.ast.modules.push(HirModule { name, public });
         Ok(())
     }
 
@@ -189,6 +190,28 @@ impl Parser {
         Ok(())
     }
 
+    fn parse_root_impl(&mut self) -> Result<()> {
+        let target = self.parse_type()?;
+        self.expect(TokenType::Colon)?;
+        let r#trait = self.parse_type()?;
+        self.expect(TokenType::LeftBrace)?;
+        let mut functions = Vec::with_capacity(0);
+        while self.maybe(TokenType::RightBrace)?.is_none() {
+            if self.maybe(TokenType::KwPub)?.is_some() {
+                self.expect(TokenType::KwFun)?;
+                functions.push(self.parse_function(true)?);
+            }
+            self.expect(TokenType::KwFun)?;
+            functions.push(self.parse_function(false)?);
+        }
+        self.ast.impls.push(HirImpl {
+            target,
+            r#trait,
+            functions,
+        });
+        Ok(())
+    }
+
     fn parse_root_function(&mut self, public: bool) -> Result<()> {
         let function = self.parse_function(public)?;
         self.ast.functions.push(function);
@@ -198,6 +221,7 @@ impl Parser {
     fn parse_struct_field(&mut self, public: bool) -> Result<HirStructField> {
         let r#type = self.parse_type()?;
         let name = self.expect(TokenType::Identifier)?.slice;
+        self.expect(TokenType::Semicolon)?;
         Ok(HirStructField {
             name,
             public,
