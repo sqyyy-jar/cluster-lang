@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::hir::{HirImpl, HirStructField, HirTypeDecl};
+use crate::hir::{HirEnumVariant, HirImpl, HirStructField, HirTypeDecl};
 use crate::{
     hir::{HirConst, HirFunction},
     lexer::{Lexer, Token, TokenType},
@@ -82,18 +82,20 @@ impl Parser {
                         TokenType::KwConst => self.parse_root_const(true)?,
                         TokenType::KwTrait => self.parse_root_trait(true)?,
                         TokenType::KwStruct => self.parse_root_struct(true)?,
+                        TokenType::KwEnum => self.parse_root_enum(true)?,
                         TokenType::KwFun => self.parse_root_function(true)?,
                         _ => return Err(Error::UnexpectedToken(next.slice)),
                     }
                 }
                 TokenType::KwModule => self.parse_root_module(false)?,
                 TokenType::KwImport => {
-                    self.parse_root_import(&mut Vec::new())?;
+                    self.parse_root_import(&mut Vec::with_capacity(1))?;
                     self.expect(TokenType::Semicolon)?;
                 }
                 TokenType::KwConst => self.parse_root_const(false)?,
                 TokenType::KwTrait => self.parse_root_trait(false)?,
                 TokenType::KwStruct => self.parse_root_struct(false)?,
+                TokenType::KwEnum => self.parse_root_enum(false)?,
                 TokenType::KwImpl => self.parse_root_impl()?,
                 TokenType::KwFun => self.parse_root_function(false)?,
                 _ => {
@@ -150,6 +152,7 @@ impl Parser {
     fn parse_root_trait(&mut self, public: bool) -> Result<()> {
         let name = self.expect(TokenType::Identifier)?.slice;
         // todo: generics
+        self.expect(TokenType::LeftBrace)?;
         let mut functions = Vec::with_capacity(0);
         while self.maybe(TokenType::RightBrace)?.is_none() {
             functions.push(self.parse_function(false)?);
@@ -165,6 +168,7 @@ impl Parser {
     fn parse_root_struct(&mut self, public: bool) -> Result<()> {
         let name = self.expect(TokenType::Identifier)?.slice;
         // todo: generics
+        self.expect(TokenType::LeftBrace)?;
         let mut fields = Vec::with_capacity(0);
         let mut functions = Vec::with_capacity(0);
         while self.maybe(TokenType::RightBrace)?.is_none() {
@@ -188,6 +192,35 @@ impl Parser {
             name,
             public,
             fields,
+            functions,
+        });
+        Ok(())
+    }
+
+    fn parse_root_enum(&mut self, public: bool) -> Result<()> {
+        let name = self.expect(TokenType::Identifier)?.slice;
+        // todo: generics
+        self.expect(TokenType::LeftBrace)?;
+        let mut variants = Vec::with_capacity(0);
+        let mut functions = Vec::with_capacity(0);
+        while self.maybe(TokenType::RightBrace)?.is_none() {
+            match self.peek()?.r#type {
+                TokenType::KwPub => {
+                    self.expect_one()?;
+                    self.expect(TokenType::KwFun)?;
+                    functions.push(self.parse_function(true)?);
+                }
+                TokenType::KwFun => {
+                    self.expect_one()?;
+                    functions.push(self.parse_function(false)?);
+                }
+                _ => variants.push(self.parse_enum_variant()?),
+            }
+        }
+        self.ast.types.push(HirTypeDecl::Enum {
+            name,
+            public,
+            variants,
             functions,
         });
         Ok(())
@@ -232,6 +265,38 @@ impl Parser {
         })
     }
 
+    fn parse_enum_variant(&mut self) -> Result<HirEnumVariant> {
+        let name = self.expect(TokenType::Identifier)?.slice;
+        match self.peek()?.r#type {
+            TokenType::Semicolon => {
+                self.expect_one()?;
+                Ok(HirEnumVariant::Empty { name })
+            }
+            TokenType::LeftParen => {
+                self.expect_one()?;
+                let mut types = Vec::with_capacity(0);
+                while self.maybe(TokenType::RightParen)?.is_none() {
+                    let r#type = self.parse_type()?;
+                    types.push(r#type);
+                    if self.maybe(TokenType::Comma)?.is_none() {
+                        self.expect(TokenType::RightParen)?;
+                        break;
+                    }
+                }
+                Ok(HirEnumVariant::Tuple { name, types })
+            }
+            TokenType::LeftBrace => {
+                self.expect_one()?;
+                let mut fields = Vec::with_capacity(0);
+                while self.maybe(TokenType::RightBrace)?.is_none() {
+                    fields.push(self.parse_struct_field(true)?);
+                }
+                Ok(HirEnumVariant::Struct { name, fields })
+            }
+            _ => Err(Error::UnexpectedToken(self.expect_one()?.slice)),
+        }
+    }
+
     fn parse_function(&mut self, public: bool) -> Result<HirFunction> {
         let name = self.expect(TokenType::Identifier)?.slice;
         // todo: generics
@@ -256,9 +321,15 @@ impl Parser {
     }
 
     fn parse_type(&mut self) -> Result<HirType> {
-        let name = self.expect(TokenType::Identifier)?;
+        let base = self.expect(TokenType::Identifier)?.slice;
+        let mut parts = vec![base];
+        while self.maybe(TokenType::Dot)?.is_some() {
+            parts.push(self.expect(TokenType::Identifier)?.slice);
+        }
         // todo: generics
-        Ok(HirType { name: name.slice })
+        Ok(HirType {
+            path: HirPath { parts },
+        })
     }
 
     fn parse_import_group(&mut self, buf: &mut Vec<Str>) -> Result<()> {
@@ -278,24 +349,21 @@ impl Parser {
     fn parse_function_params(&mut self) -> Result<Vec<HirFunctionParam>> {
         let mut params = Vec::with_capacity(0);
         self.expect(TokenType::LeftParen)?;
-        loop {
-            if self.peek()?.r#type == TokenType::RightParen {
-                break;
-            }
+        while self.maybe(TokenType::RightParen)?.is_none() {
             let r#type = self.parse_type()?;
             let name = self.expect(TokenType::Identifier)?.slice;
             params.push(HirFunctionParam { name, r#type });
-            if self.peek()?.r#type != TokenType::Comma {
+            if self.maybe(TokenType::Comma)?.is_none() {
+                self.expect(TokenType::RightParen)?;
                 break;
             }
         }
-        self.expect(TokenType::RightParen)?;
         Ok(params)
     }
 
     fn parse_block(&mut self) -> Result<HirBlock> {
         self.expect(TokenType::LeftBrace)?;
-        let mut statements = Vec::new();
+        let mut statements = Vec::with_capacity(0);
         while self.maybe(TokenType::RightBrace)?.is_none() {
             statements.push(self.parse_statement()?);
         }

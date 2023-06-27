@@ -25,15 +25,15 @@ impl Default for Hir {
     }
 }
 
-// todo: generics
-#[derive(Debug)]
-pub struct HirType {
-    pub name: Str,
-}
-
 #[derive(Debug)]
 pub struct HirPath {
     pub parts: Vec<Str>,
+}
+
+// todo: generics
+#[derive(Debug)]
+pub struct HirType {
+    pub path: HirPath,
 }
 
 #[derive(Debug)]
@@ -96,12 +96,6 @@ pub struct HirFunction {
 }
 
 #[derive(Debug)]
-pub struct HirFunctionParam {
-    pub name: Str,
-    pub r#type: HirType,
-}
-
-#[derive(Debug)]
 pub struct HirStructField {
     pub name: Str,
     pub public: bool,
@@ -109,9 +103,24 @@ pub struct HirStructField {
 }
 
 #[derive(Debug)]
-pub struct HirEnumVariant {
+pub enum HirEnumVariant {
+    Empty {
+        name: Str,
+    },
+    Tuple {
+        name: Str,
+        types: Vec<HirType>,
+    },
+    Struct {
+        name: Str,
+        fields: Vec<HirStructField>,
+    },
+}
+
+#[derive(Debug)]
+pub struct HirFunctionParam {
     pub name: Str,
-    pub r#type: Option<HirType>,
+    pub r#type: HirType,
 }
 
 #[derive(Debug)]
