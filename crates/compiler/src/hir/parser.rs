@@ -381,6 +381,7 @@ impl Parser {
                         self.expect(TokenType::Semicolon)?;
                         Ok(HirStatement::Assign { expr, value })
                     }
+                    // todo: add error slice
                     _ => Err(Error::UnexpectedExpression),
                 }
             }
@@ -449,7 +450,7 @@ impl Parser {
                 }
                 self.parse_access_expression(left)
             }
-            _ => Err(Error::InvalidUnaryExpression),
+            _ => Err(Error::InvalidUnaryExpression(left.slice)),
         }
     }
 

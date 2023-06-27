@@ -9,7 +9,6 @@ pub enum Error {
     UnexpectedExpression,
     InvalidEscapeSequence(Str),
     InvalidFloat(Str),
-    InvalidToken,
-    InvalidUnaryExpression,
-    InvalidBinaryExpression,
+    InvalidToken(Str),
+    InvalidUnaryExpression(Str),
 }

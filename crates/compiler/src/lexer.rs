@@ -445,7 +445,7 @@ impl Lexer {
                         TokenType::Identifier
                     }
                 }
-                _ => return Err(Error::InvalidToken),
+                _ => return Err(Error::InvalidToken(Str(index, self.index))),
             };
             return Ok(Some(Token::new(token_type, Str(index, self.index - index))));
         }
