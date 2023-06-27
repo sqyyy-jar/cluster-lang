@@ -6,12 +6,10 @@ pub mod util;
 
 #[cfg(test)]
 mod test {
-    use crate::error::Error;
     use std::process::exit;
     use std::rc::Rc;
 
     use crate::hir::parser::Parser;
-    use crate::prelude::Str;
 
     #[test]
     fn debug_crash() {
@@ -86,31 +84,7 @@ fun main() {
         "#,
         ));
         if let Err(err) = parser.parse() {
-            match err {
-                Error::UnexpectedEof => {
-                    eprintln!("UnexpectedEof");
-                }
-                Error::UnexpectedToken(slice) => {
-                    eprintln!("UnexpectedToken: {:?}", parser.lex.slice(slice));
-                    eprintln!("{}", parser.lex.slice(Str(0, slice.0)));
-                    eprintln!("**{}**", parser.lex.slice(slice));
-                }
-                Error::UnexpectedExpression => {
-                    eprintln!("UnexpectedExpression");
-                }
-                Error::InvalidEscapeSequence(slice) => {
-                    eprintln!("InvalidEscapeSequence: {:?}", parser.lex.slice(slice));
-                }
-                Error::InvalidFloat(slice) => {
-                    eprintln!("InvalidFloat: {:?}", parser.lex.slice(slice));
-                }
-                Error::InvalidToken(slice) => {
-                    eprintln!("InvalidToken: {:?}", parser.lex.slice(slice));
-                }
-                Error::InvalidUnaryExpression(slice) => {
-                    eprintln!("InvalidUnaryExpression: {:?}", parser.lex.slice(slice));
-                }
-            }
+            eprintln!("Error: {err:?} ({:?})", err.slice(&parser.lex));
             exit(1);
         }
         println!("{:#?}", parser.ast);
