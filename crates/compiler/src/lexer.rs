@@ -289,13 +289,17 @@ impl Lexer {
                         TokenType::Plus
                     }
                 }
-                '-' => {
-                    if self.maybe('=') {
+                '-' => match self.peek() {
+                    Ok('=') => {
+                        self.eat();
                         TokenType::MinusEqual
-                    } else {
-                        TokenType::Minus
                     }
-                }
+                    Ok('>') => {
+                        self.eat();
+                        TokenType::Arrow
+                    }
+                    _ => TokenType::Minus,
+                },
                 '*' => {
                     if self.maybe('=') {
                         TokenType::StarEqual
