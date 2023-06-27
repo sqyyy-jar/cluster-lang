@@ -1,4 +1,3 @@
-use crate::lexer::Lexer;
 use crate::prelude::Str;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -15,14 +14,14 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn slice<'a>(&self, lex: &'a Lexer) -> Option<&'a str> {
+    pub fn slice(&self) -> Option<Str> {
         match self {
             Error::UnexpectedEof | Error::UnexpectedExpression => None,
             Error::UnexpectedToken(slice)
             | Error::InvalidEscapeSequence(slice)
             | Error::InvalidFloat(slice)
             | Error::InvalidToken(slice)
-            | Error::InvalidUnaryExpression(slice) => Some(lex.slice(*slice)),
+            | Error::InvalidUnaryExpression(slice) => Some(*slice),
         }
     }
 }

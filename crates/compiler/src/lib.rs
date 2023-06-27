@@ -10,6 +10,7 @@ mod test {
     use std::rc::Rc;
 
     use crate::hir::parser::Parser;
+    use crate::prelude::Str;
 
     #[test]
     fn debug_crash() {
@@ -84,7 +85,13 @@ fun main() {
         "#,
         ));
         if let Err(err) = parser.parse() {
-            eprintln!("Error: {err:?} ({:?})", err.slice(&parser.lex));
+            if let Some(slice) = err.slice() {
+                let rest = parser.lex.slice(Str(0, slice.0));
+                let slice = parser.lex.slice(slice);
+                eprintln!("Error: {err:?}\n----------------\n{rest}**{slice}**<----");
+            } else {
+                eprintln!("Error: {err:?}");
+            }
             exit(1);
         }
         println!("{:#?}", parser.ast);
