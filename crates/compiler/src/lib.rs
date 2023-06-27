@@ -6,33 +6,113 @@ pub mod util;
 
 #[cfg(test)]
 mod test {
+    use crate::error::Error;
+    use std::process::exit;
     use std::rc::Rc;
 
     use crate::hir::parser::Parser;
+    use crate::prelude::Str;
 
     #[test]
     fn debug_crash() {
         let mut parser = Parser::new(Rc::from(
             r#"
-module test;
+// A module from another file
+module util;
 
-import a:{b, c.d};
+import std:{io.println, math.sqrt, Array};
+
+trait Length {
+    fun length(Self self) -> float;
+}
+
+enum Number {
+    integer(int);
+    float(float);
+    none;
+}
+
+struct Vec3 {
+    float x;
+    float y;
+    float z;
+
+    fun new(float x, float y, float z) -> Vec3 {
+        // Maybe add `x: x` -> `x` from Rust
+        // return Vec3{
+        //     x: x,
+        //     y: y,
+        //     z: z,
+        // };
+    }
+
+    fun add(Self self, Vec3 other) -> Vec3 {
+        return Vec3.new(
+            self.x + other.x,
+            self.y + other.y,
+            self.z + other.z,
+        );
+    }
+}
+
+impl Vec3 : Length {
+    // todo: self type and param
+    fun len(Self self) -> float {
+        return sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
+    }
+}
+
+const a = 1;
+
+fun do_math(int x, int y) -> int {
+    const z = 7;
+    return x + y * 7;
+}
+
+// todo: -> Array<int>
+fun create_array(int start, int end) -> Array {
+    var array = Array.new(end - start + 1);
+    // for i in 0..(end - start) {
+    //     array[i] = i + start;
+    // }
+    return array;
+}
 
 fun main() {
-    // a.a.a = 2;
-    // a();
-    // a.b();
-    // a().b();
-    // (1 + 2).a();
-    // "abc".len();
-    // a((1 + 2) * 3);
-    // a(a[0].a[0].a);
-    // a[0] = 1;
-    if a > b {} elseif a {} else {}
+    println("Hello world!");
+    const my_vec = Vec3.new(5.0, 2.0, 3.0);
+    // const my_num = Number{ int: 10 };
 }
         "#,
         ));
-        parser.parse().expect("Parse");
+        if let Err(err) = parser.parse() {
+            match err {
+                Error::UnexpectedEof => {
+                    eprintln!("UnexpectedEof");
+                }
+                Error::UnexpectedToken(slice) => {
+                    eprintln!("UnexpectedToken: {:?}", parser.lex.slice(slice));
+                    eprintln!("{}", parser.lex.slice(Str(0, slice.0)));
+                    eprintln!("**{}**", parser.lex.slice(slice));
+                }
+                Error::UnexpectedExpression => {
+                    eprintln!("UnexpectedExpression");
+                }
+                Error::InvalidEscapeSequence(slice) => {
+                    eprintln!("InvalidEscapeSequence: {:?}", parser.lex.slice(slice));
+                }
+                Error::InvalidFloat(slice) => {
+                    eprintln!("InvalidFloat: {:?}", parser.lex.slice(slice));
+                }
+                Error::InvalidToken(slice) => {
+                    eprintln!("InvalidToken: {:?}", parser.lex.slice(slice));
+                }
+                Error::InvalidUnaryExpression(slice) => {
+                    eprintln!("InvalidUnaryExpression: {:?}", parser.lex.slice(slice));
+                }
+            }
+            exit(1);
+        }
         println!("{:#?}", parser.ast);
     }
 }

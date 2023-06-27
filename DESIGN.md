@@ -36,7 +36,7 @@
 
 ## Ideas
 
-```rs
+```rust
 // A module from another file
 module util;
 
@@ -66,7 +66,7 @@ struct Vec3 {
         };
     }
 
-    fun add(*self, other: Vec3) -> Vec3 {
+    fun add(*self, Vec3 other) -> Vec3 {
         return Vec3.new(
             self.x + other.x,
             self.y + other.y,

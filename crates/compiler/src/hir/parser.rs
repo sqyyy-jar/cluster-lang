@@ -155,6 +155,7 @@ impl Parser {
         self.expect(TokenType::LeftBrace)?;
         let mut functions = Vec::with_capacity(0);
         while self.maybe(TokenType::RightBrace)?.is_none() {
+            self.expect(TokenType::KwFun)?;
             functions.push(self.parse_function(false)?);
         }
         self.ast.types.push(HirTypeDecl::Trait {
@@ -174,7 +175,6 @@ impl Parser {
         while self.maybe(TokenType::RightBrace)?.is_none() {
             if self.maybe(TokenType::KwPub)?.is_some() {
                 if self.maybe(TokenType::KwFun)?.is_some() {
-                    self.expect_one()?;
                     functions.push(self.parse_function(true)?);
                     continue;
                 }
@@ -182,7 +182,6 @@ impl Parser {
                 continue;
             }
             if self.maybe(TokenType::KwFun)?.is_some() {
-                self.expect_one()?;
                 functions.push(self.parse_function(false)?);
                 continue;
             }
@@ -283,6 +282,7 @@ impl Parser {
                         break;
                     }
                 }
+                self.expect(TokenType::Semicolon)?;
                 Ok(HirEnumVariant::Tuple { name, types })
             }
             TokenType::LeftBrace => {
@@ -347,8 +347,8 @@ impl Parser {
     }
 
     fn parse_function_params(&mut self) -> Result<Vec<HirFunctionParam>> {
-        let mut params = Vec::with_capacity(0);
         self.expect(TokenType::LeftParen)?;
+        let mut params = Vec::with_capacity(0);
         while self.maybe(TokenType::RightParen)?.is_none() {
             let r#type = self.parse_type()?;
             let name = self.expect(TokenType::Identifier)?.slice;
