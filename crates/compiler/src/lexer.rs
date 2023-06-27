@@ -194,23 +194,36 @@ impl Lexer {
         self.index < self.source.len() as u32
     }
 
-    pub fn peek(&self) -> Option<char> {
-        self.source.get(self.index as usize..)?.chars().next()
+    pub fn peek(&self) -> Result<char> {
+        self.source
+            .get(self.index as usize..)
+            .ok_or(Error::UnexpectedEof)?
+            .chars()
+            .next()
+            .ok_or(Error::UnexpectedEof)
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> Result<char> {
+        let c = self.peek()?;
+        self.index += c.len_utf8() as u32;
+        Ok(c)
     }
 
     pub fn eat(&mut self) {
-        self.index += self
-            .source
-            .get(self.index as usize..)
-            .unwrap()
-            .chars()
-            .next()
-            .unwrap()
-            .len_utf8() as u32;
+        self.index += self.peek().unwrap().len_utf8() as u32;
+    }
+
+    pub fn maybe(&mut self, c: char) -> bool {
+        if self.peek() == Ok(c) {
+            self.eat();
+            return true;
+        }
+        false
     }
 
     pub fn skip_whitespace(&mut self) {
-        while let Some(c) = self.peek() {
+        while let Ok(c) = self.peek() {
             if !c.is_whitespace() {
                 break;
             }
@@ -226,10 +239,9 @@ impl Lexer {
         loop {
             self.skip_whitespace();
             let index = self.index;
-            let Some(c) = self.peek() else {
+            let Ok(c) = self.next() else {
                 return Ok(None);
             };
-            self.eat();
             let token_type: TokenType = match c {
                 '(' => TokenType::LeftParen,
                 ')' => TokenType::RightParen,
@@ -243,69 +255,62 @@ impl Lexer {
                 '#' => TokenType::Hashtag,
                 ',' => TokenType::Comma,
                 '!' => {
-                    if let Some('=') = self.peek() {
-                        self.eat();
+                    if self.maybe('=') {
                         TokenType::BangEqual
                     } else {
                         TokenType::Bang
                     }
                 }
                 '&' => {
-                    if let Some('=') = self.peek() {
-                        self.eat();
+                    if self.maybe('=') {
                         TokenType::AndEqual
                     } else {
                         TokenType::And
                     }
                 }
                 '|' => {
-                    if let Some('=') = self.peek() {
-                        self.eat();
+                    if self.maybe('=') {
                         TokenType::PipeEqual
                     } else {
                         TokenType::Pipe
                     }
                 }
                 '^' => {
-                    if let Some('=') = self.peek() {
-                        self.eat();
+                    if self.maybe('=') {
                         TokenType::CaretEqual
                     } else {
                         TokenType::Caret
                     }
                 }
                 '+' => {
-                    if let Some('=') = self.peek() {
-                        self.eat();
+                    if self.maybe('=') {
                         TokenType::PlusEqual
                     } else {
                         TokenType::Plus
                     }
                 }
                 '-' => {
-                    if let Some('=') = self.peek() {
-                        self.eat();
+                    if self.maybe('=') {
                         TokenType::MinusEqual
                     } else {
                         TokenType::Minus
                     }
                 }
                 '*' => {
-                    if let Some('=') = self.peek() {
-                        self.eat();
+                    if self.maybe('=') {
                         TokenType::StarEqual
                     } else {
                         TokenType::Star
                     }
                 }
                 '/' => match self.peek() {
-                    Some('=') => {
+                    Ok('=') => {
                         self.eat();
                         TokenType::SlashEqual
                     }
-                    Some('/') => {
+                    Ok('/') => {
                         self.eat();
-                        while let Some(c) = self.peek() {
+                        while let Ok(c) = self.peek() {
                             if c == '\n' {
                                 break;
                             }
@@ -316,38 +321,36 @@ impl Lexer {
                     _ => TokenType::Slash,
                 },
                 '%' => {
-                    if let Some('=') = self.peek() {
-                        self.eat();
+                    if self.maybe('=') {
                         TokenType::PercentEqual
                     } else {
                         TokenType::Percent
                     }
                 }
                 '=' => {
-                    if let Some('=') = self.peek() {
-                        self.eat();
+                    if self.maybe('=') {
                         TokenType::EqualEqual
                     } else {
                         TokenType::Equal
                     }
                 }
                 '<' => match self.peek() {
-                    Some('=') => {
+                    Ok('=') => {
                         self.eat();
                         TokenType::LessEqual
                     }
-                    Some('<') => {
+                    Ok('<') => {
                         self.eat();
                         TokenType::LessLess
                     }
                     _ => TokenType::Less,
                 },
                 '>' => match self.peek() {
-                    Some('=') => {
+                    Ok('=') => {
                         self.eat();
                         TokenType::LessEqual
                     }
-                    Some('>') => {
+                    Ok('>') => {
                         self.eat();
                         TokenType::GreaterGreater
                     }
@@ -356,22 +359,19 @@ impl Lexer {
                 '.' | '0'..='9' => 'blk: {
                     let mut is_float = c == '.';
                     let ac = self.peek();
-                    if is_float && (ac.is_none() || !ac.unwrap().is_ascii_digit()) {
+                    if is_float && !matches!(ac, Ok('0'..='9')) {
                         break 'blk TokenType::Dot;
                     }
                     let ac = ac.unwrap();
                     if is_float && ac == '.' {
                         self.eat();
-                        let bc = self.peek();
-                        if bc == Some('.') {
-                            self.eat();
+                        if self.maybe('.') {
                             break 'blk TokenType::DotDotDot;
                         }
                         break 'blk TokenType::DotDot;
                     }
-                    while let Some(bc) = self.peek() {
-                        if bc == '.' {
-                            self.eat();
+                    while let Ok(bc) = self.peek() {
+                        if self.maybe('.') {
                             if is_float {
                                 return Err(Error::InvalidFloat(Str(index, self.index)));
                             }
@@ -391,41 +391,29 @@ impl Lexer {
                 }
                 '"' => {
                     loop {
-                        let ac = self.peek();
-                        if ac.is_none() {
-                            return Err(Error::UnexpectedEof);
-                        }
-                        let ac = ac.unwrap();
+                        let ac = self.peek()?;
                         if ac == '\\' {
                             let escape_sequence_start = self.index;
                             self.eat();
-                            let Some(bc) = self.peek() else {
-                                return Err(Error::UnexpectedEof);
-                            };
+                            let bc = self.peek()?;
                             match bc {
                                 '"' | '\\' | 'n' | 't' | 'r' => self.eat(),
                                 'x' => {
                                     self.eat();
-                                    let Some(cc) = self.peek() else {
-                                        return Err(Error::UnexpectedEof);
-                                    };
+                                    let cc = self.next()?;
                                     if !matches!(cc, '0'..='9' | 'a'..='f' | 'A'..='F') {
                                         return Err(Error::InvalidEscapeSequence(Str(
                                             escape_sequence_start,
                                             self.index,
                                         )));
                                     }
-                                    self.eat();
-                                    let Some(dc) = self.peek() else {
-                                        return Err(Error::UnexpectedEof);
-                                    };
+                                    let dc = self.next()?;
                                     if !matches!(dc, '0'..='9' | 'a'..='f' | 'A'..='F') {
                                         return Err(Error::InvalidEscapeSequence(Str(
                                             escape_sequence_start,
                                             self.index,
                                         )));
                                     }
-                                    self.eat();
                                 }
                                 _ => {
                                     return Err(Error::InvalidEscapeSequence(Str(
@@ -444,7 +432,7 @@ impl Lexer {
                     TokenType::String
                 }
                 'a'..='z' | 'A'..='Z' | '_' => {
-                    while let Some(ac) = self.peek() {
+                    while let Ok(ac) = self.peek() {
                         if !ac.is_ascii_alphanumeric() && ac != '_' {
                             break;
                         }
