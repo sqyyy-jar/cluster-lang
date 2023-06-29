@@ -32,8 +32,10 @@ pub struct HirPath {
 
 // todo: generics
 #[derive(Debug)]
-pub struct HirType {
-    pub path: HirPath,
+pub enum HirType {
+    Direct { path: HirPath },
+    Reference { r#type: Box<HirType> },
+    ConstReference { r#type: Box<HirType> },
 }
 
 #[derive(Debug)]

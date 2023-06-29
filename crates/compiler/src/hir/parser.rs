@@ -321,13 +321,21 @@ impl Parser {
     }
 
     fn parse_type(&mut self) -> Result<HirType> {
+        if self.maybe(TokenType::Star)?.is_some() {
+            if self.maybe(TokenType::KwConst)?.is_some() {
+                let r#type = Box::new(self.parse_type()?);
+                return Ok(HirType::ConstReference { r#type });
+            }
+            let r#type = Box::new(self.parse_type()?);
+            return Ok(HirType::Reference { r#type });
+        }
         let base = self.expect(TokenType::Identifier)?.slice;
         let mut parts = vec![base];
         while self.maybe(TokenType::Dot)?.is_some() {
             parts.push(self.expect(TokenType::Identifier)?.slice);
         }
         // todo: generics
-        Ok(HirType {
+        Ok(HirType::Direct {
             path: HirPath { parts },
         })
     }
