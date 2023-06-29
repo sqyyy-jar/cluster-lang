@@ -322,6 +322,11 @@ impl Lexer {
                         }
                         continue;
                     }
+                    Ok('*') => {
+                        self.eat();
+                        self.parse_multiline_comment()?;
+                        continue;
+                    }
                     _ => TokenType::Slash,
                 },
                 '%' => {
@@ -360,98 +365,124 @@ impl Lexer {
                     }
                     _ => TokenType::Greater,
                 },
-                '.' | '0'..='9' => 'blk: {
-                    let mut is_float = c == '.';
-                    let ac = self.peek();
-                    if is_float && !matches!(ac, Ok('0'..='9')) {
-                        break 'blk TokenType::Dot;
-                    }
-                    let ac = ac.unwrap();
-                    if is_float && ac == '.' {
-                        self.eat();
-                        if self.maybe('.') {
-                            break 'blk TokenType::DotDotDot;
-                        }
-                        break 'blk TokenType::DotDot;
-                    }
-                    while let Ok(bc) = self.peek() {
-                        if self.maybe('.') {
-                            if is_float {
-                                return Err(Error::InvalidFloat(Str(index, self.index)));
-                            }
-                            is_float = true;
-                            continue;
-                        }
-                        if !bc.is_ascii_digit() {
-                            break;
-                        }
-                        self.eat();
-                    }
-                    if is_float {
-                        TokenType::Float
-                    } else {
-                        TokenType::Integer
-                    }
-                }
-                '"' => {
-                    loop {
-                        let ac = self.peek()?;
-                        if ac == '\\' {
-                            let escape_sequence_start = self.index;
-                            self.eat();
-                            let bc = self.peek()?;
-                            match bc {
-                                '"' | '\\' | 'n' | 't' | 'r' => self.eat(),
-                                'x' => {
-                                    self.eat();
-                                    let cc = self.next()?;
-                                    if !matches!(cc, '0'..='9' | 'a'..='f' | 'A'..='F') {
-                                        return Err(Error::InvalidEscapeSequence(Str(
-                                            escape_sequence_start,
-                                            self.index,
-                                        )));
-                                    }
-                                    let dc = self.next()?;
-                                    if !matches!(dc, '0'..='9' | 'a'..='f' | 'A'..='F') {
-                                        return Err(Error::InvalidEscapeSequence(Str(
-                                            escape_sequence_start,
-                                            self.index,
-                                        )));
-                                    }
-                                }
-                                _ => {
-                                    return Err(Error::InvalidEscapeSequence(Str(
-                                        escape_sequence_start,
-                                        self.index,
-                                    )))
-                                }
-                            }
-                            continue;
-                        }
-                        self.eat();
-                        if ac == '"' {
-                            break;
-                        }
-                    }
-                    TokenType::String
-                }
-                'a'..='z' | 'A'..='Z' | '_' => {
-                    while let Ok(ac) = self.peek() {
-                        if !ac.is_ascii_alphanumeric() && ac != '_' {
-                            break;
-                        }
-                        self.eat();
-                    }
-                    let ident = self.slice(Str(index, self.index - index));
-                    if let Some(kw) = KEYWORDS.get(ident) {
-                        *kw
-                    } else {
-                        TokenType::Identifier
-                    }
-                }
+                '.' | '0'..='9' => self.parse_number(index, c)?,
+                '"' => self.parse_string()?,
+                'a'..='z' | 'A'..='Z' | '_' => self.parse_identifier(index)?,
                 _ => return Err(Error::InvalidToken(Str(index, self.index))),
             };
             return Ok(Some(Token::new(token_type, Str(index, self.index - index))));
         }
+    }
+
+    pub fn parse_multiline_comment(&mut self) -> Result<()> {
+        loop {
+            let Ok(c) = self.peek() else {
+                return Err(Error::UnexpectedEof);
+            };
+            self.eat();
+            if c != '*' {
+                continue;
+            }
+            let Ok(c) = self.peek() else {
+                return Err(Error::UnexpectedEof);
+            };
+            self.eat();
+            if c == '/' {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn parse_number(&mut self, index: u32, c: char) -> Result<TokenType> {
+        let mut is_float = c == '.';
+        let ac = self.peek();
+        if is_float && !matches!(ac, Ok('0'..='9')) {
+            return Ok(TokenType::Dot);
+        }
+        let ac = ac.unwrap();
+        if is_float && ac == '.' {
+            self.eat();
+            if self.maybe('.') {
+                return Ok(TokenType::DotDotDot);
+            }
+            return Ok(TokenType::DotDot);
+        }
+        while let Ok(bc) = self.peek() {
+            if self.maybe('.') {
+                if is_float {
+                    return Err(Error::InvalidFloat(Str(index, self.index)));
+                }
+                is_float = true;
+                continue;
+            }
+            if !bc.is_ascii_digit() {
+                break;
+            }
+            self.eat();
+        }
+        Ok(if is_float {
+            TokenType::Float
+        } else {
+            TokenType::Integer
+        })
+    }
+
+    pub fn parse_string(&mut self) -> Result<TokenType> {
+        loop {
+            let ac = self.peek()?;
+            if ac == '\\' {
+                let escape_sequence_start = self.index;
+                self.eat();
+                let bc = self.peek()?;
+                match bc {
+                    '"' | '\\' | 'n' | 't' | 'r' => self.eat(),
+                    'x' => {
+                        self.eat();
+                        let cc = self.next()?;
+                        if !matches!(cc, '0'..='9' | 'a'..='f' | 'A'..='F') {
+                            return Err(Error::InvalidEscapeSequence(Str(
+                                escape_sequence_start,
+                                self.index,
+                            )));
+                        }
+                        let dc = self.next()?;
+                        if !matches!(dc, '0'..='9' | 'a'..='f' | 'A'..='F') {
+                            return Err(Error::InvalidEscapeSequence(Str(
+                                escape_sequence_start,
+                                self.index,
+                            )));
+                        }
+                    }
+                    _ => {
+                        return Err(Error::InvalidEscapeSequence(Str(
+                            escape_sequence_start,
+                            self.index,
+                        )))
+                    }
+                }
+                continue;
+            }
+            self.eat();
+            if ac == '"' {
+                break;
+            }
+        }
+        Ok(TokenType::String)
+    }
+
+    pub fn parse_identifier(&mut self, index: u32) -> Result<TokenType> {
+        while let Ok(ac) = self.peek() {
+            if !ac.is_ascii_alphanumeric() && ac != '_' {
+                break;
+            }
+            self.eat();
+        }
+        let ident = self.slice(Str(index, self.index - index));
+        Ok(if let Some(kw) = KEYWORDS.get(ident) {
+            *kw
+        } else {
+            TokenType::Identifier
+        })
     }
 }

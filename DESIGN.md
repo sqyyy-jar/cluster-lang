@@ -1,7 +1,7 @@
 # TODO
 
-- [ ] Lexer
-  - [ ] multiline comments
+- [x] Lexer
+  - [x] multiline comments
 - [ ] HIR
   - [ ] self parameters
   - [ ] Self type
