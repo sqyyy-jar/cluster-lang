@@ -226,9 +226,9 @@ impl Parser {
     }
 
     fn parse_root_impl(&mut self) -> Result<()> {
-        let target = self.parse_type()?;
+        let target = self.parse_type(0)?;
         self.expect(TokenType::Colon)?;
-        let r#trait = self.parse_type()?;
+        let r#trait = self.parse_type(0)?;
         self.expect(TokenType::LeftBrace)?;
         let mut functions = Vec::with_capacity(0);
         while self.maybe(TokenType::RightBrace)?.is_none() {
@@ -254,7 +254,7 @@ impl Parser {
     }
 
     fn parse_struct_field(&mut self, public: bool) -> Result<HirStructField> {
-        let r#type = self.parse_type()?;
+        let r#type = self.parse_type(0)?;
         let name = self.expect(TokenType::Identifier)?.slice;
         self.expect(TokenType::Semicolon)?;
         Ok(HirStructField {
@@ -275,7 +275,7 @@ impl Parser {
                 self.expect_one()?;
                 let mut types = Vec::with_capacity(0);
                 while self.maybe(TokenType::RightParen)?.is_none() {
-                    let r#type = self.parse_type()?;
+                    let r#type = self.parse_type(0)?;
                     types.push(r#type);
                     if self.maybe(TokenType::Comma)?.is_none() {
                         self.expect(TokenType::RightParen)?;
@@ -302,7 +302,7 @@ impl Parser {
         // todo: generics
         let params = self.parse_function_params()?;
         let return_type = if self.maybe(TokenType::Arrow)?.is_some() {
-            Some(self.parse_type()?)
+            Some(self.parse_type(0)?)
         } else {
             None
         };
@@ -320,13 +320,23 @@ impl Parser {
         })
     }
 
-    fn parse_type(&mut self) -> Result<HirType> {
+    fn parse_type(&mut self, depth: usize) -> Result<HirType> {
         if self.maybe(TokenType::Star)?.is_some() {
+            if depth == 0 && self.maybe(TokenType::KwSelf)?.is_some() {
+                return Ok(HirType::Reference {
+                    r#type: Box::new(HirType::SelfType),
+                });
+            }
             if self.maybe(TokenType::KwConst)?.is_some() {
-                let r#type = Box::new(self.parse_type()?);
+                if depth == 0 && self.maybe(TokenType::KwSelf)?.is_some() {
+                    return Ok(HirType::ConstReference {
+                        r#type: Box::new(HirType::SelfType),
+                    });
+                }
+                let r#type = Box::new(self.parse_type(depth + 1)?);
                 return Ok(HirType::ConstReference { r#type });
             }
-            let r#type = Box::new(self.parse_type()?);
+            let r#type = Box::new(self.parse_type(depth + 1)?);
             return Ok(HirType::Reference { r#type });
         }
         let base = self.expect(TokenType::Identifier)?.slice;
@@ -358,7 +368,7 @@ impl Parser {
         self.expect(TokenType::LeftParen)?;
         let mut params = Vec::with_capacity(0);
         while self.maybe(TokenType::RightParen)?.is_none() {
-            let r#type = self.parse_type()?;
+            let r#type = self.parse_type(0)?;
             let name = self.expect(TokenType::Identifier)?.slice;
             params.push(HirFunctionParam { name, r#type });
             if self.maybe(TokenType::Comma)?.is_none() {
@@ -467,7 +477,7 @@ impl Parser {
     fn parse_var_decl(&mut self) -> Result<(Str, Option<HirType>, Option<HirExpression>)> {
         let name = self.expect(TokenType::Identifier)?.slice;
         let r#type = if self.maybe(TokenType::Colon)?.is_some() {
-            Some(self.parse_type()?)
+            Some(self.parse_type(0)?)
         } else {
             None
         };

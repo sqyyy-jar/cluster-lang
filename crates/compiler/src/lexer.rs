@@ -12,6 +12,7 @@ pub const KEYWORDS: Map<&str, TokenType> = phf_map! {
     "enum" => TokenType::KwEnum,
     "impl" => TokenType::KwImpl,
     "fun" => TokenType::KwFun,
+    "Self" => TokenType::KwSelf,
     "const" => TokenType::KwConst,
     "var" => TokenType::KwVar,
     "if" => TokenType::KwIf,
@@ -100,6 +101,7 @@ pub enum TokenType {
     KwEnum,
     KwImpl,
     KwFun,
+    KwSelf,
     KwConst,
     KwVar,
     KwIf,
@@ -206,7 +208,7 @@ impl Lexer {
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Result<char> {
         let c = self.peek()?;
-        self.index += c.len_utf8() as u32;
+        self.eat();
         Ok(c)
     }
 

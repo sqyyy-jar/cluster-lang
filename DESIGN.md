@@ -3,8 +3,8 @@
 - [x] Lexer
   - [x] multiline comments
 - [ ] HIR
-  - [ ] self parameters
-  - [ ] Self type
+  - [ ] ~~self parameters~~
+  - [x] Self type
   - [ ] generics
   - [ ] struct initializer syntax
   - [ ] enum initializer syntax
