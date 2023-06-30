@@ -339,6 +339,11 @@ impl Parser {
             let r#type = Box::new(self.parse_type(depth + 1)?);
             return Ok(HirType::Reference { r#type });
         }
+        if depth == 0 && self.maybe(TokenType::KwSelf)?.is_some() {
+            return Ok(HirType::Reference {
+                r#type: Box::new(HirType::SelfType),
+            });
+        }
         let base = self.expect(TokenType::Identifier)?.slice;
         let mut parts = vec![base];
         while self.maybe(TokenType::Dot)?.is_some() {
